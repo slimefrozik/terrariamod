@@ -290,6 +290,7 @@ namespace MacroMod.Common.UI
 
 		private void CancelEdit()
 		{
+			CloseAllPopups();
 			_editMode = false;
 			_editorLines = null;
 			RefreshDetail();
@@ -301,6 +302,7 @@ namespace MacroMod.Common.UI
 			var macro = MacroLibrary.FindMacro(_selected);
 			if (macro == null) return;
 			MacroLibrary.UpdateSource(macro, VisualLine.SerializeAll(_editorLines));
+			CloseAllPopups();
 			_editMode = false;
 			_editorLines = null;
 			Refresh();
@@ -333,6 +335,7 @@ namespace MacroMod.Common.UI
 		private void DeleteSelected()
 		{
 			if (_selected == null) return;
+			CloseAllPopups();
 			MacroLibrary.DeleteMacro(_selected);
 			_selected = null;
 			_editMode = false;
@@ -353,6 +356,7 @@ namespace MacroMod.Common.UI
 
 		public void Select(string name)
 		{
+			CloseAllPopups();
 			_selected = name;
 			_editMode = false;
 			_editorLines = null;
@@ -460,43 +464,46 @@ namespace MacroMod.Common.UI
 
 		private void WireRow(LineRow row)
 		{
+			// Each callback re-checks _editorLines because the popup may outlive
+			// the editor (e.g. the user clicks a different macro in the list while
+			// a picker is still open).  CloseAllPopups normally handles that, but
+			// the guard makes the row defensively crash-proof.
 			row.RequestEditCommand = (idx, current) => OpenPopup(new CommandPickerPopup {
 				OnPicked = kw => {
-					if (idx >= 0 && idx < _editorLines.Count) {
-						_editorLines[idx].Keyword = kw;
-						_editorLines[idx].RawOverride = null;
-						RebuildEditor();
-					}
+					if (_editorLines == null || idx < 0 || idx >= _editorLines.Count) return;
+					_editorLines[idx].Keyword = kw;
+					_editorLines[idx].RawOverride = null;
+					RebuildEditor();
 				}
 			});
-			row.RequestEditConditions = idx => OpenPopup(new ConditionPopup(idx >= 0 && idx < _editorLines.Count ? _editorLines[idx].Conditions : string.Empty) {
-				OnApply = serialized => {
-					if (idx >= 0 && idx < _editorLines.Count) {
+			row.RequestEditConditions = idx => {
+				if (_editorLines == null || idx < 0 || idx >= _editorLines.Count) return;
+				OpenPopup(new ConditionPopup(_editorLines[idx].Conditions) {
+					OnApply = serialized => {
+						if (_editorLines == null || idx < 0 || idx >= _editorLines.Count) return;
 						_editorLines[idx].Conditions = serialized;
 						RebuildEditor();
 					}
-				}
-			});
+				});
+			};
 			row.RequestPickContent = (idx, isBuff) => OpenPopup(new ItemPickerPopup(isBuff) {
 				OnPicked = name => {
-					if (idx >= 0 && idx < _editorLines.Count) {
-						_editorLines[idx].Args = name;
-						RebuildEditor();
-					}
-				}
-			});
-			row.RequestMoveUp = idx => { if (idx > 0) { (_editorLines[idx], _editorLines[idx - 1]) = (_editorLines[idx - 1], _editorLines[idx]); RebuildEditor(); } };
-			row.RequestMoveDown = idx => { if (idx >= 0 && idx < _editorLines.Count - 1) { (_editorLines[idx], _editorLines[idx + 1]) = (_editorLines[idx + 1], _editorLines[idx]); RebuildEditor(); } };
-			row.RequestDelete = idx => { if (idx >= 0 && idx < _editorLines.Count) { _editorLines.RemoveAt(idx); RebuildEditor(); } };
-			row.RequestDuplicate = idx => {
-				if (idx >= 0 && idx < _editorLines.Count) {
-					var src = _editorLines[idx];
-					var clone = new VisualLine { Keyword = src.Keyword, Args = src.Args, Conditions = src.Conditions, RawOverride = src.RawOverride };
-					_editorLines.Insert(idx + 1, clone);
+					if (_editorLines == null || idx < 0 || idx >= _editorLines.Count) return;
+					_editorLines[idx].Args = name;
 					RebuildEditor();
 				}
+			});
+			row.RequestMoveUp = idx => { if (_editorLines != null && idx > 0 && idx < _editorLines.Count) { (_editorLines[idx], _editorLines[idx - 1]) = (_editorLines[idx - 1], _editorLines[idx]); RebuildEditor(); } };
+			row.RequestMoveDown = idx => { if (_editorLines != null && idx >= 0 && idx < _editorLines.Count - 1) { (_editorLines[idx], _editorLines[idx + 1]) = (_editorLines[idx + 1], _editorLines[idx]); RebuildEditor(); } };
+			row.RequestDelete = idx => { if (_editorLines != null && idx >= 0 && idx < _editorLines.Count) { _editorLines.RemoveAt(idx); RebuildEditor(); } };
+			row.RequestDuplicate = idx => {
+				if (_editorLines == null || idx < 0 || idx >= _editorLines.Count) return;
+				var src = _editorLines[idx];
+				var clone = new VisualLine { Keyword = src.Keyword, Args = src.Args, Conditions = src.Conditions, RawOverride = src.RawOverride };
+				_editorLines.Insert(idx + 1, clone);
+				RebuildEditor();
 			};
-			row.RequestInsertAfter = idx => { _editorLines.Insert(idx + 1, new VisualLine()); RebuildEditor(); };
+			row.RequestInsertAfter = idx => { if (_editorLines != null && idx >= -1 && idx < _editorLines.Count) { _editorLines.Insert(idx + 1, new VisualLine()); RebuildEditor(); } };
 			row.OnDirty = () => { /* args field already updated on the model */ };
 		}
 
@@ -508,6 +515,15 @@ namespace MacroMod.Common.UI
 			Append(popup);
 			popup.Activate();
 			popup.Recalculate();
+		}
+
+		public void CloseAllPopups()
+		{
+			if (_popupStack.Count == 0) return;
+			// Snapshot to avoid mutation during iteration.
+			var pending = _popupStack.ToArray();
+			_popupStack.Clear();
+			foreach (var p in pending) RemoveChild(p);
 		}
 
 		public void ClosePopup(UIElement popup)
