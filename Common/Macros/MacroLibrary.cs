@@ -173,6 +173,12 @@ namespace MacroMod.Common.Macros
 			if (macro == null) return;
 			macro.Triggers = new List<MacroTrigger>(triggers ?? new List<MacroTrigger>());
 			macro.TriggerMode = mode;
+			// Reset edge-detection state so swapping triggers (e.g. from
+			// "HP <= 30" to "is daytime") does not produce a spurious rising
+			// edge on the very next tick — TriggerSystem will re-prime the
+			// initial sample from the new trigger set.
+			macro.TriggerInitialized = false;
+			macro.LastTriggerValue = false;
 
 			// Strip any existing header from the source, then re-write.
 			var stripMode = TriggerMatchMode.Any;
