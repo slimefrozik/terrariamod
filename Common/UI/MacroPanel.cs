@@ -50,6 +50,7 @@ namespace MacroMod.Common.UI
 		private UITextPanel<LocalizedText> _editToggleBtn;
 		private UITextPanel<LocalizedText> _saveBtn;
 		private UITextPanel<LocalizedText> _runBtn;
+		private UITextPanel<string> _runningPill;
 
 		private string _selected;
 		private bool _editMode;
@@ -72,6 +73,20 @@ namespace MacroMod.Common.UI
 
 			var title = new UIText(Language.GetText("Mods.MacroMod.UI.Title"), 1.2f, true) { HAlign = 0f };
 			_root.Append(title);
+
+			// Running-macros pill: shows live count, opens a popup with a
+			// per-macro Stop button.  Pinned to the top-right next to X.
+			_runningPill = new UITextPanel<string>("", 0.75f, true) {
+				BackgroundColor = UIPalette.PillRunning,
+				BorderColor = Color.Transparent,
+			};
+			_runningPill.Width.Set(110f, 0f);
+			_runningPill.Height.Set(28f, 0f);
+			_runningPill.HAlign = 1f;
+			_runningPill.Left.Set(-44f, 0f);
+			_runningPill.Top.Set(2f, 0f);
+			_runningPill.OnLeftClick += (_, __) => OpenPopup(new RunningMacrosPopup());
+			_root.Append(_runningPill);
 
 			var closeBtn = new UITextPanel<string>("X", 0.8f, true);
 			closeBtn.Width.Set(32f, 0f);
@@ -166,18 +181,32 @@ namespace MacroMod.Common.UI
 			// Toolbar buttons (run / edit-toggle / save / templates / reload / open-folder / external / delete).
 			// All eight buttons share a single fixed row at DetailToolbarTop; widths
 			// are computed from the index so localised labels never overflow into
-			// the keybind row pinned to the bottom of the panel.
-			int toolbarCount = 8;
-			_runBtn = AppendToolbarBtn("Mods.MacroMod.UI.Run", 0, toolbarCount, () => {
-				if (_selected != null) MacroSystem.StartMacro(_selected);
-			});
-			_editToggleBtn = AppendToolbarBtn("Mods.MacroMod.UI.Edit", 1, toolbarCount, ToggleEditMode);
-			_saveBtn = AppendToolbarBtn("Mods.MacroMod.UI.Save", 2, toolbarCount, SaveEdit);
-			AppendToolbarBtn("Mods.MacroMod.UI.Templates", 3, toolbarCount, OpenTemplatePopup);
-			AppendToolbarBtn("Mods.MacroMod.UI.Reload", 4, toolbarCount, () => { MacroLibrary.ReloadAll(); Refresh(); });
-			AppendToolbarBtn("Mods.MacroMod.UI.OpenFolder", 5, toolbarCount, OpenFolder);
-			AppendToolbarBtn("Mods.MacroMod.UI.EditExternal", 6, toolbarCount, OpenInExternalEditor);
-			AppendToolbarBtn("Mods.MacroMod.UI.Delete", 7, toolbarCount, DeleteSelected);
+			// the keybind row pinned to the bottom of the panel.  Buttons are
+			// grouped (run/stop · edit/save · templates · reload/folder/external · delete)
+			// with small visual gaps between groups.
+			var btnSpecs = new (string Key, Action Act, int Group, Color Tint)[] {
+				("Mods.MacroMod.UI.Run",          () => { if (_selected != null) MacroSystem.StartMacro(_selected); }, 0, new Color(70, 130, 90)),
+				("Mods.MacroMod.UI.Stop",         MacroSystem.StopAll,                                                  0, new Color(150, 80, 80)),
+				("Mods.MacroMod.UI.Edit",         ToggleEditMode,                                                       1, new Color(80, 110, 170)),
+				("Mods.MacroMod.UI.Save",         SaveEdit,                                                             1, new Color(80, 110, 170)),
+				("Mods.MacroMod.UI.Templates",    OpenTemplatePopup,                                                    2, new Color(120, 90, 160)),
+				("Mods.MacroMod.UI.Reload",       () => { MacroLibrary.ReloadAll(); Refresh(); },                       3, new Color(80, 100, 130)),
+				("Mods.MacroMod.UI.OpenFolder",   OpenFolder,                                                           3, new Color(80, 100, 130)),
+				("Mods.MacroMod.UI.EditExternal", OpenInExternalEditor,                                                 3, new Color(80, 100, 130)),
+				("Mods.MacroMod.UI.Delete",       DeleteSelected,                                                       4, new Color(150, 80, 80)),
+			};
+			int total = btnSpecs.Length;
+			const int groupCount = 5;
+			const float groupGap = 0.012f;
+			float usable = 1f - groupGap * (groupCount - 1);
+			float slot = usable / total;
+			for (int i = 0; i < total; i++) {
+				float baseLeft = i * slot + (btnSpecs[i].Group == 0 ? 0f : groupGap * btnSpecs[i].Group);
+				var btn = MakeToolbarBtn(btnSpecs[i].Key, slot, baseLeft, btnSpecs[i].Tint, btnSpecs[i].Act);
+				if (i == 0) _runBtn = btn;
+				if (i == 2) _editToggleBtn = btn;
+				if (i == 3) _saveBtn = btn;
+			}
 
 			// Preview (read-only) panel — fills the gap between toolbar and the
 			// keybind row at the bottom (KeybindRowHeight + small padding).
@@ -241,14 +270,15 @@ namespace MacroMod.Common.UI
 			AppendKeybindRow();
 		}
 
-		private UITextPanel<LocalizedText> AppendToolbarBtn(string langKey, int index, int total, Action act)
+		private UITextPanel<LocalizedText> MakeToolbarBtn(string langKey, float slotFraction, float leftFraction, Color tint, Action act)
 		{
-			var btn = new UITextPanel<LocalizedText>(Language.GetText(langKey), 0.78f, true);
-			float slot = 1f / total;
-			float gap = 0.005f;
-			btn.Width.Set(-4f, slot - gap);
+			var btn = new UITextPanel<LocalizedText>(Language.GetText(langKey), 0.78f, true) {
+				BackgroundColor = tint,
+				BorderColor = Color.Transparent,
+			};
+			btn.Width.Set(-4f, slotFraction);
 			btn.Height.Set(DetailToolbarHeight, 0f);
-			btn.Left.Set(0f, slot * index);
+			btn.Left.Set(0f, leftFraction);
 			btn.Top.Set(DetailToolbarTop, 0f);
 			btn.OnLeftClick += (_, __) => {
 				try { act(); } catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
@@ -394,8 +424,15 @@ namespace MacroMod.Common.UI
 		public void Refresh()
 		{
 			_macroList?.Clear();
+			var p = Main.LocalPlayer?.GetModPlayer<MacroPlayer>();
 			foreach (var m in MacroLibrary.All.OrderBy(m => m.Name)) {
-				_macroList.Add(new MacroListItem(m, m.Name == _selected, () => Select(m.Name)));
+				int bound = -1;
+				if (p != null) {
+					for (int i = 0; i < MacroKeybindSystem.SlotCount; i++) {
+						if (string.Equals(p.GetSlot(i), m.Name, StringComparison.OrdinalIgnoreCase)) { bound = i; break; }
+					}
+				}
+				_macroList.Add(new MacroListItem(m, m.Name == _selected, bound, () => Select(m.Name)));
 			}
 			RefreshDetail();
 		}
@@ -581,18 +618,115 @@ namespace MacroMod.Common.UI
 
 		public bool HasOpenPopup => _popupStack.Count > 0;
 
+		public override void Update(GameTime gameTime)
+		{
+			base.Update(gameTime);
+			RefreshRunningPill();
+		}
+
+		private void RefreshRunningPill()
+		{
+			if (_runningPill == null) return;
+			int count = MacroSystem.Instance?.Running?.Count ?? 0;
+			_runningPill.SetText(count == 0
+				? Language.GetText("Mods.MacroMod.UI.RunningIdle").Value
+				: string.Format(Language.GetText("Mods.MacroMod.UI.RunningPill").Value, count));
+			_runningPill.BackgroundColor = count == 0 ? UIPalette.PillNeutral : UIPalette.PillRunning;
+		}
+
 		// ---- helper subclasses -------------------------------------------
 
 		private class MacroListItem : UIPanel
 		{
-			public MacroListItem(Macro macro, bool selected, Action onClick)
+			private readonly UIText _runningDot;
+
+			public MacroListItem(Macro macro, bool selected, int boundSlot, Action onClick)
 			{
-				BackgroundColor = selected ? new Color(120, 100, 200) : new Color(50, 60, 110);
+				BackgroundColor = selected
+					? UIPalette.CardSelected
+					: (macro.HasError ? UIPalette.CardError : UIPalette.CardIdle);
+				BorderColor = selected ? new Color(220, 220, 255) * 0.7f : Color.Transparent;
 				Width.Set(0f, 1f);
-				Height.Set(28f, 0f);
+				Height.Set(40f, 0f);
 				SetPadding(4f);
-				Append(new UIText(macro.Name + (macro.HasError ? " (!)" : string.Empty), 0.9f));
+
+				// Vertical accent bar on the left so the eye can scan the
+				// list quickly.  Bound macros get a brighter cyan stripe.
+				var stripe = new UIPanel {
+					BackgroundColor = boundSlot >= 0 ? UIPalette.PillBound : UIPalette.PillNeutral,
+					BorderColor = Color.Transparent,
+				};
+				stripe.Width.Set(4f, 0f);
+				stripe.Height.Set(0f, 1f);
+				stripe.Left.Set(0f, 0f);
+				Append(stripe);
+
+				var name = new UIText(macro.Name, 0.95f, true) { TextColor = Color.White };
+				name.Left.Set(10f, 0f);
+				name.Top.Set(2f, 0f);
+				Append(name);
+
+				// Sub-line: line count + parse-error short note.
+				int lineCount = macro.Source?.Split('\n').Length ?? 0;
+				string sub = macro.HasError
+					? "! " + (macro.ParseError ?? "parse error")
+					: lineCount + " lines";
+				if (sub.Length > 36) sub = sub.Substring(0, 33) + "...";
+				var subText = new UIText(sub, 0.7f) { TextColor = new Color(190, 200, 230) };
+				subText.Left.Set(10f, 0f);
+				subText.Top.Set(20f, 0f);
+				Append(subText);
+
+				// Right-side badges
+				if (boundSlot >= 0) {
+					var bind = MakePill("⌨ " + (boundSlot + 1), UIPalette.PillBound);
+					bind.HAlign = 1f;
+					bind.Top.Set(2f, 0f);
+					bind.Left.Set(-4f, 0f);
+					Append(bind);
+				}
+				_runningDot = new UIText("●", 0.95f, true) {
+					TextColor = UIPalette.PillRunning,
+					HAlign = 1f,
+				};
+				_runningDot.Top.Set(20f, 0f);
+				_runningDot.Left.Set(-4f, 0f);
+				_runningDot.Width.Set(14f, 0f);
+				_runningDot.Height.Set(16f, 0f);
+				Append(_runningDot);
+
 				OnLeftClick += (_, __) => onClick?.Invoke();
+			}
+
+			private static UITextPanel<string> MakePill(string label, Color bg)
+			{
+				var p = new UITextPanel<string>(label, 0.7f, true) {
+					BackgroundColor = bg,
+					BorderColor = Color.Transparent,
+				};
+				p.Width.Set(46f, 0f);
+				p.Height.Set(18f, 0f);
+				return p;
+			}
+
+			public override void Update(GameTime gameTime)
+			{
+				base.Update(gameTime);
+				// Lazy retag — running status is read every frame instead of
+				// pushed via events, since macros can finish mid-frame.
+				if (_runningDot != null) {
+					_runningDot.TextColor = MacroSystem.IsRunning(GetMacroName())
+						? UIPalette.PillRunning
+						: Color.Transparent;
+				}
+			}
+
+			private string GetMacroName()
+			{
+				foreach (var c in Children) {
+					if (c is UIText t && t.Top.Pixels < 10f) return t.Text;
+				}
+				return string.Empty;
 			}
 		}
 

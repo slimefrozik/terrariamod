@@ -65,6 +65,13 @@ Mods: {
 			Templates: Templates
 			PickTemplate: Pick a macro template
 			TemplateHelp: "Pick a scenario; a new macro will be created with the script pre-filled."
+			Stop: Stop
+			StopAll: Stop all running
+			RunningPill: "Running: {0}"
+			RunningIdle: Idle
+			RunningTitle: Running macros
+			RunningEmpty: No macros are currently running.
+			Preview: Preview
 		}
 
 		NoSuchItem: "No item matches '{0}'."
