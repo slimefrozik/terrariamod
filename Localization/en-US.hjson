@@ -62,6 +62,9 @@ Mods: {
 			Apply: Apply
 			Clear: Clear
 			OrGroup: "OR group #{0}"
+			Templates: Templates
+			PickTemplate: Pick a macro template
+			TemplateHelp: "Pick a scenario; a new macro will be created with the script pre-filled."
 		}
 
 		NoSuchItem: "No item matches '{0}'."

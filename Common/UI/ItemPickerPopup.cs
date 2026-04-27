@@ -39,7 +39,7 @@ namespace MacroMod.Common.UI
 			searchPanel.SetPadding(2f);
 			Append(searchPanel);
 
-			_search = new TextInput(Language.GetTextValue("Mods.MacroMod.UI.Search"));
+			_search = new TextInput(Language.GetText("Mods.MacroMod.UI.Search").Value);
 			_search.Width.Set(0f, 1f);
 			_search.Height.Set(0f, 1f);
 			_search.OnTextChange = _ => Refilter();

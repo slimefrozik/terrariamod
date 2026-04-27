@@ -106,9 +106,12 @@ namespace MacroMod.Common.Systems
 				player.selectedItem = ex.PendingHotbarSlot;
 				ex.PendingHotbarSlot = -1;
 			}
-			if (ex.PendingUseItem) {
+			if (ex.PendingUseItem || ex.HoldUseItem) {
 				player.controlUseItem = true;
 				ex.PendingUseItem = false;
+			}
+			if (ex.HoldUseAlt) {
+				player.controlUseTile = true;
 			}
 			if (!string.IsNullOrEmpty(ex.PendingChat)) {
 				if (Main.netMode == NetmodeID.SinglePlayer) {
