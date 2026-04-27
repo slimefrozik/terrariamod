@@ -49,7 +49,9 @@ namespace MacroMod.Common.Macros
 				case "maxhp":
 					return Player == null ? 0 : (double)Player.statLifeMax2;
 				case "hppct":
+				case "hp_pct":
 				case "hppercent":
+				case "hp_percent":
 					return Player == null || Player.statLifeMax2 == 0 ? 0 : 100.0 * Player.statLife / Player.statLifeMax2;
 				case "mp":
 				case "mana":
@@ -58,7 +60,9 @@ namespace MacroMod.Common.Macros
 				case "maxmp":
 					return Player == null ? 0 : (double)Player.statManaMax2;
 				case "mppct":
+				case "mp_pct":
 				case "mppercent":
+				case "mp_percent":
 					return Player == null || Player.statManaMax2 == 0 ? 0 : 100.0 * Player.statMana / Player.statManaMax2;
 				case "defense":
 					return Player == null ? 0 : (double)Player.statDefense;
