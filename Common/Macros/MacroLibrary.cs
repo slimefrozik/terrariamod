@@ -82,11 +82,16 @@ namespace MacroMod.Common.Macros
 
 		public static void UpdateSource(Macro macro, string newSource)
 		{
-			// Visual editor only round-trips the executable body.  Re-prepend
-			// the @triggers header so saving from the editor does not drop
-			// auto-execution settings.
+			// The visual editor round-trips macro.Source verbatim through
+			// VisualLine.ParseAll/SerializeAll, so newSource already contains
+			// the existing @triggers header.  Strip whatever header is in
+			// newSource before re-prepending the canonical header from the
+			// macro model — otherwise every save would duplicate the block.
+			var stripMode = TriggerMatchMode.Any;
+			var dummy = new List<MacroTrigger>();
+			string body = MacroTriggerSerializer.ExtractAndStrip(newSource ?? string.Empty, dummy, ref stripMode);
 			string header = MacroTriggerSerializer.SerializeHeader(macro.Triggers ?? new List<MacroTrigger>(), macro.TriggerMode);
-			macro.Source = header + (newSource ?? string.Empty);
+			macro.Source = header + body;
 			ParseMacro(macro);
 			Save(macro);
 		}
@@ -168,6 +173,12 @@ namespace MacroMod.Common.Macros
 			if (macro == null) return;
 			macro.Triggers = new List<MacroTrigger>(triggers ?? new List<MacroTrigger>());
 			macro.TriggerMode = mode;
+			// Reset edge-detection state so swapping triggers (e.g. from
+			// "HP <= 30" to "is daytime") does not produce a spurious rising
+			// edge on the very next tick — TriggerSystem will re-prime the
+			// initial sample from the new trigger set.
+			macro.TriggerInitialized = false;
+			macro.LastTriggerValue = false;
 
 			// Strip any existing header from the source, then re-write.
 			var stripMode = TriggerMatchMode.Any;
