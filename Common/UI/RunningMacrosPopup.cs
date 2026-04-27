@@ -66,7 +66,9 @@ namespace MacroMod.Common.UI
 			Refresh();
 		}
 
-		private int _lastSignature;
+		// -1 is impossible for ComputeSignature (which returns 0 on empty,
+		// non-zero hash otherwise), so it is safe as a force-rebuild sentinel.
+		private int _lastSignature = -1;
 
 		private void Refresh()
 		{
@@ -118,7 +120,7 @@ namespace MacroMod.Common.UI
 			stopBtn.OnLeftClick += (_, __) => {
 				MacroSystem.StopMacro(ex);
 				OnAfterChange?.Invoke();
-				_lastSignature = 0; // force rebuild next tick
+				_lastSignature = -1; // force rebuild next tick
 			};
 			row.Append(stopBtn);
 			return row;
