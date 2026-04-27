@@ -21,9 +21,11 @@ namespace MacroMod.Common.UI
 		{
 			Instance = this;
 			if (Main.dedServ) return;
-			Panel = new MacroPanel();
-			Panel.Activate();
 			_ui = new UserInterface();
+			// MacroPanel is built lazily on first Show().  ModSystem.Load runs
+			// before tModLoader applies the active culture, so any
+			// Language.GetTextValue called from OnInitialize would baseline to
+			// the raw key.  Deferring keeps every UI string resolved correctly.
 		}
 
 		public override void Unload()
@@ -41,16 +43,29 @@ namespace MacroMod.Common.UI
 
 		public void Show()
 		{
+			EnsurePanel();
 			if (Panel == null) return;
 			Panel.Refresh();
 			_ui?.SetState(Panel);
 			Visible = true;
 		}
 
+		private void EnsurePanel()
+		{
+			if (Panel != null || Main.dedServ) return;
+			Panel = new MacroPanel();
+			Panel.Activate();
+		}
+
 		public void Hide()
 		{
 			_ui?.SetState(null);
 			Visible = false;
+		}
+
+		public void ClosePopup(UIElement popup)
+		{
+			Panel?.ClosePopup(popup);
 		}
 
 		public override void UpdateUI(GameTime gameTime)

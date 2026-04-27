@@ -37,15 +37,41 @@ Mods: {
 			NewMacro: + Новый макрос
 			NoSelection: (выберите макрос слева)
 			Run: Запустить
+			Edit: Редактировать
+			Cancel: Отмена
+			Save: Сохранить
 			Reload: Перечитать
-			EditExternal: Открыть в редакторе
-			OpenFolder: Открыть папку
+			EditExternal: Внешний
+			OpenFolder: Папка
 			Delete: Удалить
 			BindSlot: Назначить на слот:
 			Unbound: (без клавиши)
 			Bound: назначено на слот {0}
 			ParseError: ошибка разбора: {0}
 			Lines: "строк: {0}"
+			AddLine: + Добавить строку
+			PickItem: Выберите предмет (поиск по всем модам)
+			PickBuff: Выберите бафф (поиск по всем модам)
+			PickCommand: Выберите команду
+			Search: поиск...
+			NoMatches: ничего не найдено
+			Conditions: Условия в стиле WoW
+			ConditionsHelp: "[a, b] — внутри И, разные [..] — ИЛИ. ! в начале — отрицание."
+			AddGroup: + Добавить ИЛИ-группу
+			AddCondition: + Добавить условие
+			Apply: Применить
+			Clear: Очистить
+			OrGroup: "ИЛИ-группа №{0}"
+			Templates: Шаблоны
+			PickTemplate: Выберите шаблон макроса
+			TemplateHelp: "Выберите готовый сценарий — будет создан новый макрос с уже заполненным скриптом."
+			Stop: Стоп
+			StopAll: Остановить все
+			RunningPill: "Активно: {0}"
+			RunningIdle: Простой
+			RunningTitle: Запущенные макросы
+			RunningEmpty: Сейчас не запущено ни одного макроса.
+			Preview: Превью
 		}
 
 		NoSuchItem: "Не найден предмет '{0}'."

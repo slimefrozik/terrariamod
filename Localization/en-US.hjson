@@ -37,15 +37,41 @@ Mods: {
 			NewMacro: + New macro
 			NoSelection: (select a macro on the left)
 			Run: Run
+			Edit: Edit
+			Cancel: Cancel
+			Save: Save
 			Reload: Reload
-			EditExternal: Edit in editor
-			OpenFolder: Open folder
+			EditExternal: External
+			OpenFolder: Folder
 			Delete: Delete
 			BindSlot: Bind to slot:
 			Unbound: (no keybind)
 			Bound: bound to keybind slot {0}
 			ParseError: parse error: {0}
 			Lines: "{0} line(s)"
+			AddLine: + Add line
+			PickItem: Pick an item (search across all loaded mods)
+			PickBuff: Pick a buff (search across all loaded mods)
+			PickCommand: Pick a command
+			Search: search...
+			NoMatches: no matches
+			Conditions: WoW-style conditions
+			ConditionsHelp: "[group1, group2] is AND inside one [..], several [..] are OR. ! at the start negates."
+			AddGroup: + Add OR group
+			AddCondition: + Add AND clause
+			Apply: Apply
+			Clear: Clear
+			OrGroup: "OR group #{0}"
+			Templates: Templates
+			PickTemplate: Pick a macro template
+			TemplateHelp: "Pick a scenario; a new macro will be created with the script pre-filled."
+			Stop: Stop
+			StopAll: Stop all running
+			RunningPill: "Running: {0}"
+			RunningIdle: Idle
+			RunningTitle: Running macros
+			RunningEmpty: No macros are currently running.
+			Preview: Preview
 		}
 
 		NoSuchItem: "No item matches '{0}'."

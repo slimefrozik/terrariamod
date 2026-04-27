@@ -49,7 +49,9 @@ namespace MacroMod.Common.Macros
 				case "maxhp":
 					return Player == null ? 0 : (double)Player.statLifeMax2;
 				case "hppct":
+				case "hp_pct":
 				case "hppercent":
+				case "hp_percent":
 					return Player == null || Player.statLifeMax2 == 0 ? 0 : 100.0 * Player.statLife / Player.statLifeMax2;
 				case "mp":
 				case "mana":
@@ -58,7 +60,9 @@ namespace MacroMod.Common.Macros
 				case "maxmp":
 					return Player == null ? 0 : (double)Player.statManaMax2;
 				case "mppct":
+				case "mp_pct":
 				case "mppercent":
+				case "mp_percent":
 					return Player == null || Player.statManaMax2 == 0 ? 0 : 100.0 * Player.statMana / Player.statManaMax2;
 				case "defense":
 					return Player == null ? 0 : (double)Player.statDefense;
@@ -139,6 +143,30 @@ namespace MacroMod.Common.Macros
 					return args.Count > 0 && PlayerHolding(Expression.ToText(args[0]));
 				case "itemcount":
 					return args.Count > 0 ? (double)CountItem(Expression.ToText(args[0])) : 0;
+				case "free_slots":
+				case "freeslots":
+					return (double)FreeInventorySlots();
+				case "used_slots":
+				case "usedslots":
+					return (double)(50 - FreeInventorySlots());
+				case "inventory_full":
+				case "inventoryfull":
+					return FreeInventorySlots() == 0;
+				case "boss_alive":
+				case "bossalive":
+					return AnyBoss();
+				case "boss_hp":
+				case "bosshp":
+					return (double)BossHpPercent();
+				case "target_distance":
+				case "nearest_enemy":
+					return (double)NearestEnemyDistance();
+				case "in_combat":
+				case "incombat":
+					return AnyHostile(args.Count > 0 ? (float)Expression.ToNumber(args[0]) : 800f);
+				case "selected_slot":
+				case "hotbar_slot":
+					return Player == null ? 0 : (double)Player.selectedItem;
 
 				// utility ---------------------------------------------------
 				case "name":
@@ -213,6 +241,47 @@ namespace MacroMod.Common.Macros
 				if (Vector2.DistanceSquared(n.Center, Player.Center) <= r2) return true;
 			}
 			return false;
+		}
+
+		/// <summary>Number of empty inventory slots (slots 0..49, excludes coins/ammo).</summary>
+		public int FreeInventorySlots()
+		{
+			if (Player == null) return 0;
+			int free = 0;
+			for (int i = 0; i < 50; i++) {
+				Item it = Player.inventory[i];
+				if (it == null || it.IsAir) free++;
+			}
+			return free;
+		}
+
+		/// <summary>Lowest HP percentage among active bosses; 0 if no bosses.</summary>
+		public int BossHpPercent()
+		{
+			int worst = 100;
+			bool any = false;
+			for (int i = 0; i < Main.maxNPCs; i++) {
+				NPC n = Main.npc[i];
+				if (!n.active || !n.boss || n.lifeMax <= 0) continue;
+				int pct = (int)(100.0 * n.life / n.lifeMax);
+				if (pct < worst) worst = pct;
+				any = true;
+			}
+			return any ? worst : 0;
+		}
+
+		/// <summary>Distance to the closest hostile NPC (in tiles); large value if none.</summary>
+		public int NearestEnemyDistance()
+		{
+			if (Player == null) return 9999;
+			float best = float.MaxValue;
+			for (int i = 0; i < Main.maxNPCs; i++) {
+				NPC n = Main.npc[i];
+				if (!n.active || n.friendly || n.lifeMax <= 5) continue;
+				float d = Vector2.Distance(n.Center, Player.Center);
+				if (d < best) best = d;
+			}
+			return best == float.MaxValue ? 9999 : (int)(best / 16f);
 		}
 	}
 }

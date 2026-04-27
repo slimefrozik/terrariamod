@@ -32,8 +32,15 @@ namespace MacroMod.Common.Macros
 		// Action latches for the host system to consume after each tick.
 		public int PendingHotbarSlot = -1;
 		public bool PendingUseItem;
+		public bool PendingUseAlt;
 		public string PendingChat;
 		public Action<Player> PendingPlayerAction;
+
+		// Persistent latches: set to true by /attack hold etc., cleared by
+		// /attack release or when the macro finishes.  The host system mirrors
+		// these onto Player.control* every tick while the macro is alive.
+		public bool HoldUseItem;
+		public bool HoldUseAlt;
 
 		private class Frame
 		{
@@ -243,6 +250,19 @@ namespace MacroMod.Common.Macros
 					return DoUseFirst(new[] {
 						"MagicMirror", "IceMirror", "CellPhone", "Shellphone", "RecallPotion",
 					});
+				case "attack":
+				case "useitem":
+					f.Ip++;
+					return DoAttack(args, alt: false);
+				case "altattack":
+				case "rightclick":
+					f.Ip++;
+					return DoAttack(args, alt: true);
+				case "release":
+					f.Ip++;
+					HoldUseItem = false;
+					HoldUseAlt = false;
+					return true;
 				default:
 					Notify(string.Format(Language.GetTextValue("Mods.MacroMod.UnknownCommand"), cmd), Color.IndianRed);
 					f.Ip++;
@@ -291,6 +311,11 @@ namespace MacroMod.Common.Macros
 		private bool DoSelectItem(string args)
 		{
 			string firstWord = SplitFirst(args, out _);
+			// Numeric argument (1..10) selects that hotbar slot directly.
+			if (int.TryParse(firstWord, out int n) && n >= 1 && n <= 10) {
+				PendingHotbarSlot = n - 1;
+				return true;
+			}
 			int slot = ItemResolver.FindHotbarSlot(_ctx.Player, firstWord);
 			if (slot < 0) {
 				int invSlot = ItemResolver.FindInventorySlot(_ctx.Player, firstWord);
@@ -336,6 +361,32 @@ namespace MacroMod.Common.Macros
 				_ctx.Player.ClearBuff(id);
 			}
 			return true;
+		}
+
+		private bool DoAttack(string args, bool alt)
+		{
+			string mode = (args ?? string.Empty).Trim().ToLowerInvariant();
+			if (mode.Length == 0) mode = "once";
+			switch (mode) {
+				case "hold":
+				case "start":
+				case "begin":
+					if (alt) HoldUseAlt = true;
+					else HoldUseItem = true;
+					return true;
+				case "release":
+				case "stop":
+				case "end":
+					if (alt) HoldUseAlt = false;
+					else HoldUseItem = false;
+					return true;
+				case "once":
+				case "click":
+				default:
+					if (alt) PendingUseAlt = true;
+					else PendingUseItem = true;
+					return false;
+			}
 		}
 
 		private bool DoSay(string text)
