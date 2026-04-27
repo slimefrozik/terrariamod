@@ -12,12 +12,50 @@
 
 ## Установка
 
-1. Подпишись или собери мод:
-   - `tModLoaderSteamPath=<путь_к_tModLoader> dotnet build -c Release MacroMod/MacroMod.csproj`
-   - либо открой `MacroMod` в **Mod Sources** в самой игре и нажми **Build + Reload**.
-2. Включи `Macro Master` в меню `Mods`.
-3. Зайди в мир. По умолчанию открой панель макросов клавишей `M`,
-   а `.` мгновенно останавливает все запущенные макросы.
+> **Важно.** tModLoader использует имя папки в `ModSources` как
+> внутреннее имя мода и требует, чтобы оно совпадало с C#-namespace.
+> Поэтому папка обязательно должна называться **`MacroMod`** —
+> не `terrariamod`, не `terrariamod-master` и т.п.
+
+### Через `git clone` (рекомендуется)
+
+```bash
+cd "<tModLoader>/ModSources"
+git clone https://github.com/slimefrozik/terrariamod MacroMod
+```
+
+`<tModLoader>` — это:
+
+- Steam: `~/.local/share/Terraria/tModLoader` (Linux) или `Documents/My Games/Terraria/tModLoader` (Windows);
+- Standalone: где у тебя установлен tModLoader.
+
+После клонирования открой **Mod Sources** в самой игре и нажми
+**Build + Reload** напротив **Macro Master**.
+
+### Через ZIP
+
+1. На странице релиза скачай архив `MacroMod.zip`.
+2. Распакуй так, чтобы получилось `<tModLoader>/ModSources/MacroMod/build.txt` (именно `MacroMod`, без префиксов).
+3. **Build + Reload** в Mod Sources.
+
+### Сборка из командной строки
+
+```bash
+cd MacroMod
+tModLoaderSteamPath=<path-to-tModLoader> dotnet build -c Release
+```
+
+После установки включи `Macro Master` в меню `Mods`. По умолчанию
+панель макросов открывается клавишей `M`, а `.` мгновенно останавливает
+все запущенные макросы.
+
+### Multiplayer
+
+Мод **клиентский** (`side = NoSync` в `build.txt`). С ним можно
+заходить на любые сервера, в том числе ванильные и без `Macro Master` —
+сервер не требует, чтобы мод был установлен у других игроков, и не
+синхронизирует ничего по сети. Все макросы выполняются как обычные
+действия твоего персонажа.
 
 ## Где лежат макросы
 
