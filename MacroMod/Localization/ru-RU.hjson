@@ -1,0 +1,59 @@
+Mods: {
+	MacroMod: {
+		DisplayName: Macro Master
+
+		Keybinds: {
+			ToggleMacroUI.DisplayName: Открыть панель макросов
+			StopAllMacros.DisplayName: Остановить все макросы
+			Macro01.DisplayName: Макрос 1
+			Macro02.DisplayName: Макрос 2
+			Macro03.DisplayName: Макрос 3
+			Macro04.DisplayName: Макрос 4
+			Macro05.DisplayName: Макрос 5
+			Macro06.DisplayName: Макрос 6
+			Macro07.DisplayName: Макрос 7
+			Macro08.DisplayName: Макрос 8
+			Macro09.DisplayName: Макрос 9
+			Macro10.DisplayName: Макрос 10
+			Macro11.DisplayName: Макрос 11
+			Macro12.DisplayName: Макрос 12
+			Macro13.DisplayName: Макрос 13
+			Macro14.DisplayName: Макрос 14
+			Macro15.DisplayName: Макрос 15
+			Macro16.DisplayName: Макрос 16
+			Macro17.DisplayName: Макрос 17
+			Macro18.DisplayName: Макрос 18
+			Macro19.DisplayName: Макрос 19
+			Macro20.DisplayName: Макрос 20
+			Macro21.DisplayName: Макрос 21
+			Macro22.DisplayName: Макрос 22
+			Macro23.DisplayName: Макрос 23
+			Macro24.DisplayName: Макрос 24
+		}
+
+		UI: {
+			Title: Macro Master
+			NewName: Имя нового макроса...
+			NewMacro: + Новый макрос
+			NoSelection: (выберите макрос слева)
+			Run: Запустить
+			Reload: Перечитать
+			EditExternal: Открыть в редакторе
+			OpenFolder: Открыть папку
+			Delete: Удалить
+			BindSlot: Назначить на слот:
+			Unbound: (без клавиши)
+			Bound: назначено на слот {0}
+			ParseError: ошибка разбора: {0}
+			Lines: "строк: {0}"
+		}
+
+		NoSuchItem: "Не найден предмет '{0}'."
+		NoSuchBuff: "Не найден бафф '{0}'."
+		NoSuchMacro: "Нет макроса с именем '{0}'."
+		ParseError: "Макрос '{0}' содержит ошибку: {1}"
+		UnknownCommand: "Неизвестная команда: /{0}"
+		LoopLimit: Превышен лимит итераций цикла. Макрос остановлен.
+		StackOverflow: Слишком много вложенных /run.
+	}
+}

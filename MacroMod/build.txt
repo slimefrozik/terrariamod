@@ -1,0 +1,8 @@
+author = slimefrozik
+displayName = Macro Master
+homepage = https://github.com/slimefrozik/terrariamod
+hideCode = false
+hideResources = false
+includeSource = true
+buildIgnore = *.csproj, *.user, obj\*, bin\*, .vs\*, .git\*, README.md
+version = 0.1.0

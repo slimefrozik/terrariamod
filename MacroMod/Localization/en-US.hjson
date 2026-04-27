@@ -1,0 +1,59 @@
+Mods: {
+	MacroMod: {
+		DisplayName: Macro Master
+
+		Keybinds: {
+			ToggleMacroUI.DisplayName: Open Macro Master panel
+			StopAllMacros.DisplayName: Stop all running macros
+			Macro01.DisplayName: Macro 1
+			Macro02.DisplayName: Macro 2
+			Macro03.DisplayName: Macro 3
+			Macro04.DisplayName: Macro 4
+			Macro05.DisplayName: Macro 5
+			Macro06.DisplayName: Macro 6
+			Macro07.DisplayName: Macro 7
+			Macro08.DisplayName: Macro 8
+			Macro09.DisplayName: Macro 9
+			Macro10.DisplayName: Macro 10
+			Macro11.DisplayName: Macro 11
+			Macro12.DisplayName: Macro 12
+			Macro13.DisplayName: Macro 13
+			Macro14.DisplayName: Macro 14
+			Macro15.DisplayName: Macro 15
+			Macro16.DisplayName: Macro 16
+			Macro17.DisplayName: Macro 17
+			Macro18.DisplayName: Macro 18
+			Macro19.DisplayName: Macro 19
+			Macro20.DisplayName: Macro 20
+			Macro21.DisplayName: Macro 21
+			Macro22.DisplayName: Macro 22
+			Macro23.DisplayName: Macro 23
+			Macro24.DisplayName: Macro 24
+		}
+
+		UI: {
+			Title: Macro Master
+			NewName: New macro name...
+			NewMacro: + New macro
+			NoSelection: (select a macro on the left)
+			Run: Run
+			Reload: Reload
+			EditExternal: Edit in editor
+			OpenFolder: Open folder
+			Delete: Delete
+			BindSlot: Bind to slot:
+			Unbound: (no keybind)
+			Bound: bound to keybind slot {0}
+			ParseError: parse error: {0}
+			Lines: "{0} line(s)"
+		}
+
+		NoSuchItem: "No item matches '{0}'."
+		NoSuchBuff: "No buff matches '{0}'."
+		NoSuchMacro: "No macro named '{0}'."
+		ParseError: "Macro '{0}' has a parse error: {1}"
+		UnknownCommand: "Unknown macro command: /{0}"
+		LoopLimit: Macro hit the loop iteration limit; aborted.
+		StackOverflow: Too many nested /run calls.
+	}
+}
