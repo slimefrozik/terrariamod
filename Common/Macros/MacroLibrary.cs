@@ -82,7 +82,11 @@ namespace MacroMod.Common.Macros
 
 		public static void UpdateSource(Macro macro, string newSource)
 		{
-			macro.Source = newSource ?? string.Empty;
+			// Visual editor only round-trips the executable body.  Re-prepend
+			// the @triggers header so saving from the editor does not drop
+			// auto-execution settings.
+			string header = MacroTriggerSerializer.SerializeHeader(macro.Triggers ?? new List<MacroTrigger>(), macro.TriggerMode);
+			macro.Source = header + (newSource ?? string.Empty);
 			ParseMacro(macro);
 			Save(macro);
 		}
@@ -144,8 +148,34 @@ namespace MacroMod.Common.Macros
 
 		private static void ParseMacro(Macro m)
 		{
-			m.Program = MacroParser.Parse(m.Source ?? string.Empty, out string err);
+			// Strip the @triggers header before tokenising so the parser
+			// only sees executable lines.  Triggers are stored on the macro
+			// model and round-tripped on Save().
+			var mode = m.TriggerMode;
+			string body = MacroTriggerSerializer.ExtractAndStrip(m.Source ?? string.Empty, m.Triggers, ref mode);
+			m.TriggerMode = mode;
+			m.Program = MacroParser.Parse(body, out string err);
 			m.ParseError = err;
+		}
+
+		/// <summary>
+		/// Replaces the macro's triggers and serialises the new header at
+		/// the top of the file so external editors see a round-trippable
+		/// document.
+		/// </summary>
+		public static void UpdateTriggers(Macro macro, IList<MacroTrigger> triggers, TriggerMatchMode mode)
+		{
+			if (macro == null) return;
+			macro.Triggers = new List<MacroTrigger>(triggers ?? new List<MacroTrigger>());
+			macro.TriggerMode = mode;
+
+			// Strip any existing header from the source, then re-write.
+			var stripMode = TriggerMatchMode.Any;
+			var dummy = new List<MacroTrigger>();
+			string body = MacroTriggerSerializer.ExtractAndStrip(macro.Source ?? string.Empty, dummy, ref stripMode);
+			string header = MacroTriggerSerializer.SerializeHeader(macro.Triggers, macro.TriggerMode);
+			macro.Source = header + body;
+			Save(macro);
 		}
 
 		private static string SanitizeName(string s)

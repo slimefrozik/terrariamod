@@ -72,6 +72,34 @@ Mods: {
 			RunningTitle: Running macros
 			RunningEmpty: No macros are currently running.
 			Preview: Preview
+
+			CreateMacroCta: + Create macro
+			NewMacroDefault: "Macro {0}"
+			LinesWithTriggers: "{0} line(s) · {1} trigger(s)"
+
+			TabEditor: Editor
+			TabTriggers: Triggers
+			TabBlocks: Blocks
+			TriggersMatch: "Match:"
+			TriggersAny: any (OR)
+			TriggersAll: all (AND)
+			AddTrigger: + Add trigger
+			SaveTriggers: Save triggers
+			TriggersEmpty: "No triggers yet — the macro starts only when you press its keybind. Add a trigger to make it run automatically."
+			TriggersSaved: Triggers saved.
+			TriggerPickKind: "Pick a trigger condition"
+
+			TrigHp: HP %
+			TrigMp: Mana %
+			TrigFreeSlots: Free inv slots
+			TrigInvFull: Inventory is full
+			TrigBuff: Has buff
+			TrigNoBuff: Missing buff
+			TrigBoss: Boss is alive
+			TrigEnemy: Enemy within radius
+			TrigNight: It is night
+			TrigDay: It is day
+			TrigOnHit: Player just took damage
 		}
 
 		NoSuchItem: "No item matches '{0}'."

@@ -72,6 +72,34 @@ Mods: {
 			RunningTitle: Запущенные макросы
 			RunningEmpty: Сейчас не запущено ни одного макроса.
 			Preview: Превью
+
+			CreateMacroCta: + Создать макрос
+			NewMacroDefault: "Макрос {0}"
+			LinesWithTriggers: "строк: {0} · триггеров: {1}"
+
+			TabEditor: Редактор
+			TabTriggers: Триггеры
+			TabBlocks: Блоки
+			TriggersMatch: "Условие:"
+			TriggersAny: любой (ИЛИ)
+			TriggersAll: все (И)
+			AddTrigger: + Добавить триггер
+			SaveTriggers: Сохранить триггеры
+			TriggersEmpty: "Триггеров пока нет — макрос запускается только по нажатию клавиши. Добавьте триггер, чтобы он включался автоматически."
+			TriggersSaved: Триггеры сохранены.
+			TriggerPickKind: "Выберите тип триггера"
+
+			TrigHp: HP %
+			TrigMp: Мана %
+			TrigFreeSlots: Свободных слотов
+			TrigInvFull: Инвентарь заполнен
+			TrigBuff: Активен бафф
+			TrigNoBuff: Отсутствует бафф
+			TrigBoss: Жив босс
+			TrigEnemy: Враг рядом (рад.)
+			TrigNight: Сейчас ночь
+			TrigDay: Сейчас день
+			TrigOnHit: Игрок только что получил урон
 		}
 
 		NoSuchItem: "Не найден предмет '{0}'."

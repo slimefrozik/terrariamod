@@ -24,6 +24,7 @@ namespace MacroMod.Common.UI
 		public static readonly Color PillRunning     = new(80, 160, 90);
 		public static readonly Color PillError       = new(180, 80, 80);
 		public static readonly Color PillCondActive  = new(170, 120, 60);
+		public static readonly Color PillActive      = new(110, 95, 195);  // tab strip — selected tab
 
 		// Editor command categories ---------------------------------------
 		public static readonly Color CmdItem         = new(50, 90, 150);   // /use, /cast, /swap, /drop
