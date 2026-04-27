@@ -1,35 +1,28 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using MacroMod.Common.Macros;
 using MacroMod.Common.Players;
 using MacroMod.Common.Systems;
 using Microsoft.Xna.Framework;
-using Microsoft.Xna.Framework.Graphics;
-using ReLogic.Content;
 using Terraria;
-using Terraria.GameContent;
 using Terraria.GameContent.UI.Elements;
 using Terraria.Localization;
-using Terraria.ModLoader;
 using Terraria.UI;
 
 namespace MacroMod.Common.UI
 {
 	/// <summary>
 	/// Main UIState shown when the player presses the Macro Master toggle
-	/// keybind (default <c>M</c>).  Renders a draggable panel containing:
-	/// <list type="bullet">
-	///   <item>a scrollable list of every <see cref="Macro"/> known to <see cref="MacroLibrary"/>;</item>
-	///   <item>a details/preview pane for the selected macro;</item>
-	///   <item>buttons to run, reload, edit externally, delete and create macros;</item>
-	///   <item>a per-character keybind slot picker so each macro can be assigned to one of the 24 hotkeys.</item>
-	/// </list>
+	/// keybind (default <c>M</c>).  Houses the macro list on the left and
+	/// either the source preview or the visual editor on the right, plus
+	/// a popup overlay (item / buff / command / condition pickers).
 	/// </summary>
 	public class MacroPanel : UIState
 	{
-		private const float PanelWidth = 720f;
-		private const float PanelHeight = 460f;
+		private const float PanelWidth = 880f;
+		private const float PanelHeight = 540f;
 
 		private DraggablePanel _root;
 		private UIList _macroList;
@@ -38,11 +31,27 @@ namespace MacroMod.Common.UI
 		private UIText _detailTitle;
 		private UIText _detailKeybind;
 		private UIText _detailStatus;
-		private UIList _detailLines;
-		private UIScrollbar _detailScroll;
-		private UITextBox _newNameBox;
+
+		private UIPanel _previewPanel;
+		private UIList _previewLines;
+		private UIScrollbar _previewScroll;
+
+		private UIPanel _editorPanel;
+		private UIList _editorList;
+		private UIScrollbar _editorScroll;
+
+		private TextInput _newNameBox;
+		private UITextPanel<string> _editToggleBtn;
+		private UITextPanel<string> _saveBtn;
+		private UITextPanel<string> _runBtn;
 
 		private string _selected;
+		private bool _editMode;
+		private List<VisualLine> _editorLines;
+
+		private readonly List<UIElement> _popupStack = new();
+
+		// ---- lifecycle ---------------------------------------------------
 
 		public override void OnInitialize()
 		{
@@ -55,10 +64,7 @@ namespace MacroMod.Common.UI
 			_root.BackgroundColor = new Color(33, 43, 79);
 			Append(_root);
 
-			var title = new UIText(Language.GetText("Mods.MacroMod.UI.Title"), 1.2f, true) {
-				HAlign = 0f,
-			};
-			title.Top.Set(0f, 0f);
+			var title = new UIText(Language.GetText("Mods.MacroMod.UI.Title"), 1.2f, true) { HAlign = 0f };
 			_root.Append(title);
 
 			var closeBtn = new UITextPanel<string>("X", 0.8f, true);
@@ -68,19 +74,26 @@ namespace MacroMod.Common.UI
 			closeBtn.OnLeftClick += (_, __) => MacroUISystem.Instance?.Hide();
 			_root.Append(closeBtn);
 
-			// --- left column: macro list + new entry ----------------------
-			var leftCol = new UIElement();
-			leftCol.Width.Set(260f, 0f);
-			leftCol.Height.Set(PanelHeight - 60f, 0f);
-			leftCol.Top.Set(40f, 0f);
-			leftCol.HAlign = 0f;
-			_root.Append(leftCol);
+			BuildLeftColumn();
+			BuildRightColumn();
+		}
+
+		// ---- left column -------------------------------------------------
+
+		private void BuildLeftColumn()
+		{
+			var col = new UIElement();
+			col.Width.Set(260f, 0f);
+			col.Height.Set(PanelHeight - 60f, 0f);
+			col.Top.Set(40f, 0f);
+			col.HAlign = 0f;
+			_root.Append(col);
 
 			var listPanel = new UIPanel { BackgroundColor = new Color(60, 70, 130) };
 			listPanel.Width.Set(0f, 1f);
 			listPanel.Height.Set(-72f, 1f);
 			listPanel.SetPadding(4f);
-			leftCol.Append(listPanel);
+			col.Append(listPanel);
 
 			_macroList = new UIList { ListPadding = 4f };
 			_macroList.Width.Set(-26f, 1f);
@@ -93,30 +106,38 @@ namespace MacroMod.Common.UI
 			listPanel.Append(_macroScroll);
 			_macroList.SetScrollbar(_macroScroll);
 
-			_newNameBox = new UITextBox(Language.GetTextValue("Mods.MacroMod.UI.NewName"), 0.9f);
-			_newNameBox.Width.Set(0f, 1f);
-			_newNameBox.Height.Set(28f, 0f);
-			_newNameBox.Top.Set(-66f, 1f);
-			_newNameBox.OnLeftClick += (_, __) => {
-				if (_newNameBox.Text == Language.GetTextValue("Mods.MacroMod.UI.NewName"))
-					_newNameBox.SetText(string.Empty);
-			};
-			leftCol.Append(_newNameBox);
+			var newBg = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
+			newBg.Width.Set(0f, 1f);
+			newBg.Height.Set(28f, 0f);
+			newBg.Top.Set(-66f, 1f);
+			newBg.SetPadding(2f);
+			col.Append(newBg);
 
-			var addBtn = MakeButton("Mods.MacroMod.UI.NewMacro", 60f, _ => {
+			_newNameBox = new TextInput(Language.GetTextValue("Mods.MacroMod.UI.NewName"));
+			_newNameBox.Width.Set(0f, 1f);
+			_newNameBox.Height.Set(0f, 1f);
+			newBg.Append(_newNameBox);
+
+			var addBtn = new UITextPanel<string>(Language.GetTextValue("Mods.MacroMod.UI.NewMacro"), 0.85f, true);
+			addBtn.Width.Set(0f, 1f);
+			addBtn.Height.Set(28f, 0f);
+			addBtn.Top.Set(-32f, 1f);
+			addBtn.OnLeftClick += (_, __) => {
 				string n = _newNameBox.Text;
-				if (string.IsNullOrWhiteSpace(n) || n == Language.GetTextValue("Mods.MacroMod.UI.NewName")) return;
+				if (string.IsNullOrWhiteSpace(n)) return;
 				var m = MacroLibrary.CreateMacro(n,
 					"# " + n + "\n# Example:\n# /use Wooden Sword\n# /wait 1\n# /quickheal\n");
 				if (m != null) Select(m.Name);
-				_newNameBox.SetText(string.Empty);
+				_newNameBox.Text = string.Empty;
 				Refresh();
-			});
-			addBtn.Top.Set(-32f, 1f);
-			addBtn.Width.Set(0f, 1f);
-			leftCol.Append(addBtn);
+			};
+			col.Append(addBtn);
+		}
 
-			// --- right column: details ------------------------------------
+		// ---- right column ------------------------------------------------
+
+		private void BuildRightColumn()
+		{
 			_detailPanel = new UIPanel { BackgroundColor = new Color(50, 60, 110) };
 			_detailPanel.Width.Set(-272f, 1f);
 			_detailPanel.Height.Set(PanelHeight - 60f, 0f);
@@ -126,7 +147,6 @@ namespace MacroMod.Common.UI
 			_root.Append(_detailPanel);
 
 			_detailTitle = new UIText(Language.GetText("Mods.MacroMod.UI.NoSelection"), 1.0f, true);
-			_detailTitle.Top.Set(0f, 0f);
 			_detailPanel.Append(_detailTitle);
 
 			_detailKeybind = new UIText(string.Empty, 0.85f);
@@ -137,86 +157,79 @@ namespace MacroMod.Common.UI
 			_detailStatus.Top.Set(50f, 0f);
 			_detailPanel.Append(_detailStatus);
 
-			var sourcePanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
-			sourcePanel.Width.Set(0f, 1f);
-			sourcePanel.Height.Set(-160f, 1f);
-			sourcePanel.Top.Set(76f, 0f);
-			sourcePanel.SetPadding(4f);
-			_detailPanel.Append(sourcePanel);
-
-			_detailLines = new UIList { ListPadding = 2f };
-			_detailLines.Width.Set(-26f, 1f);
-			_detailLines.Height.Set(0f, 1f);
-			sourcePanel.Append(_detailLines);
-
-			_detailScroll = new UIScrollbar();
-			_detailScroll.Height.Set(0f, 1f);
-			_detailScroll.HAlign = 1f;
-			sourcePanel.Append(_detailScroll);
-			_detailLines.SetScrollbar(_detailScroll);
-
-			// bottom row of buttons
-			AppendButton("Mods.MacroMod.UI.Run", 0f, () => {
+			// Toolbar buttons (run / edit-toggle / save / reload / open-folder / external / delete)
+			_runBtn = AppendToolbarBtn("Mods.MacroMod.UI.Run", 0, () => {
 				if (_selected != null) MacroSystem.StartMacro(_selected);
 			});
-			AppendButton("Mods.MacroMod.UI.Reload", 1f, () => {
-				MacroLibrary.ReloadAll();
-				Refresh();
-			});
-			AppendButton("Mods.MacroMod.UI.EditExternal", 2f, () => {
-				if (_selected == null) return;
-				string path = Path.Combine(MacroLibrary.MacroDirectory, _selected + MacroLibrary.FileExtension);
-				try {
-					System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
-						FileName = path,
-						UseShellExecute = true,
-					});
-				}
-				catch (Exception e) {
-					Main.NewText("MacroMod: " + e.Message, Color.IndianRed);
-				}
-			});
-			AppendButton("Mods.MacroMod.UI.OpenFolder", 3f, () => {
-				try {
-					System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
-						FileName = MacroLibrary.MacroDirectory,
-						UseShellExecute = true,
-					});
-				}
-				catch (Exception e) {
-					Main.NewText("MacroMod: " + e.Message, Color.IndianRed);
-				}
-			});
-			AppendButton("Mods.MacroMod.UI.Delete", 4f, () => {
-				if (_selected == null) return;
-				MacroLibrary.DeleteMacro(_selected);
-				_selected = null;
-				Refresh();
-			});
+			_editToggleBtn = AppendToolbarBtn("Mods.MacroMod.UI.Edit", 1, ToggleEditMode);
+			_saveBtn = AppendToolbarBtn("Mods.MacroMod.UI.Save", 2, SaveEdit);
+			AppendToolbarBtn("Mods.MacroMod.UI.Reload", 3, () => { MacroLibrary.ReloadAll(); Refresh(); });
+			AppendToolbarBtn("Mods.MacroMod.UI.OpenFolder", 4, OpenFolder);
+			AppendToolbarBtn("Mods.MacroMod.UI.EditExternal", 5, OpenInExternalEditor);
+			AppendToolbarBtn("Mods.MacroMod.UI.Delete", 6, DeleteSelected);
+
+			// Preview (read-only) panel
+			_previewPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
+			_previewPanel.Width.Set(0f, 1f);
+			_previewPanel.Height.Set(-180f, 1f);
+			_previewPanel.Top.Set(76f, 0f);
+			_previewPanel.SetPadding(4f);
+			_detailPanel.Append(_previewPanel);
+
+			_previewLines = new UIList { ListPadding = 2f };
+			_previewLines.Width.Set(-26f, 1f);
+			_previewLines.Height.Set(0f, 1f);
+			_previewPanel.Append(_previewLines);
+
+			_previewScroll = new UIScrollbar();
+			_previewScroll.Height.Set(0f, 1f);
+			_previewScroll.HAlign = 1f;
+			_previewPanel.Append(_previewScroll);
+			_previewLines.SetScrollbar(_previewScroll);
+
+			// Editor panel (visual builder)
+			_editorPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
+			_editorPanel.Width.Set(0f, 1f);
+			_editorPanel.Height.Set(-180f, 1f);
+			_editorPanel.Top.Set(76f, 0f);
+			_editorPanel.SetPadding(4f);
+
+			_editorList = new UIList { ListPadding = 4f };
+			_editorList.Width.Set(-26f, 1f);
+			_editorList.Height.Set(-44f, 1f);
+			_editorPanel.Append(_editorList);
+
+			_editorScroll = new UIScrollbar();
+			_editorScroll.Height.Set(-44f, 1f);
+			_editorScroll.HAlign = 1f;
+			_editorPanel.Append(_editorScroll);
+			_editorList.SetScrollbar(_editorScroll);
+
+			var addLineBtn = new UITextPanel<string>(Language.GetTextValue("Mods.MacroMod.UI.AddLine"), 0.85f, true);
+			addLineBtn.Width.Set(0f, 1f);
+			addLineBtn.Height.Set(36f, 0f);
+			addLineBtn.Top.Set(-36f, 1f);
+			addLineBtn.OnLeftClick += (_, __) => {
+				_editorLines?.Add(new VisualLine());
+				RebuildEditor();
+			};
+			_editorPanel.Append(addLineBtn);
 
 			AppendKeybindRow();
 		}
 
-		private UITextPanel<string> MakeButton(string langKey, float ty, Action<UIElement> onClick)
+		private UITextPanel<string> AppendToolbarBtn(string langKey, int index, Action act)
 		{
-			var btn = new UITextPanel<string>(Language.GetTextValue(langKey), 0.85f, true);
-			btn.Width.Set(0f, 0.32f);
+			var btn = new UITextPanel<string>(Language.GetTextValue(langKey), 0.75f, true);
+			btn.Width.Set(0f, 0.135f);
 			btn.Height.Set(28f, 0f);
-			btn.OnLeftClick += (_, e) => onClick(e);
-			return btn;
-		}
-
-		private void AppendButton(string langKey, float index, Action act)
-		{
-			var btn = new UITextPanel<string>(Language.GetTextValue(langKey), 0.8f, true);
-			btn.Width.Set(0f, 0.19f);
-			btn.Height.Set(30f, 0f);
-			btn.HAlign = index / 4f;
+			btn.HAlign = index / 6f;
 			btn.Top.Set(-72f, 1f);
 			btn.OnLeftClick += (_, __) => {
 				try { act(); } catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
 			};
 			_detailPanel.Append(btn);
+			return btn;
 		}
 
 		private void AppendKeybindRow()
@@ -248,9 +261,8 @@ namespace MacroMod.Common.UI
 			if (_selected == null) return;
 			var p = Main.LocalPlayer?.GetModPlayer<MacroPlayer>();
 			if (p == null) return;
-			// Toggle: if already bound to this slot, clear; otherwise assign and clear other slots holding this macro.
-			bool alreadyBound = string.Equals(p.GetSlot(slotIndex), _selected, StringComparison.OrdinalIgnoreCase);
-			if (alreadyBound) {
+			bool already = string.Equals(p.GetSlot(slotIndex), _selected, StringComparison.OrdinalIgnoreCase);
+			if (already) {
 				p.SetSlot(slotIndex, string.Empty);
 			}
 			else {
@@ -262,14 +274,79 @@ namespace MacroMod.Common.UI
 			Refresh();
 		}
 
+		// ---- toolbar actions ---------------------------------------------
+
+		private void ToggleEditMode()
+		{
+			if (_selected == null) return;
+			if (_editMode) { CancelEdit(); return; }
+			var macro = MacroLibrary.FindMacro(_selected);
+			if (macro == null) return;
+			_editorLines = VisualLine.ParseAll(macro.Source);
+			_editMode = true;
+			RefreshDetail();
+			RebuildEditor();
+		}
+
+		private void CancelEdit()
+		{
+			_editMode = false;
+			_editorLines = null;
+			RefreshDetail();
+		}
+
+		private void SaveEdit()
+		{
+			if (!_editMode || _selected == null || _editorLines == null) return;
+			var macro = MacroLibrary.FindMacro(_selected);
+			if (macro == null) return;
+			MacroLibrary.UpdateSource(macro, VisualLine.SerializeAll(_editorLines));
+			_editMode = false;
+			_editorLines = null;
+			Refresh();
+		}
+
+		private void OpenFolder()
+		{
+			MacroLibrary.EnsureDirectory();
+			try {
+				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
+					FileName = MacroLibrary.MacroDirectory,
+					UseShellExecute = true,
+				});
+			}
+			catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
+		}
+
+		private void OpenInExternalEditor()
+		{
+			if (_selected == null) return;
+			string path = Path.Combine(MacroLibrary.MacroDirectory, _selected + MacroLibrary.FileExtension);
+			try {
+				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo {
+					FileName = path, UseShellExecute = true,
+				});
+			}
+			catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
+		}
+
+		private void DeleteSelected()
+		{
+			if (_selected == null) return;
+			MacroLibrary.DeleteMacro(_selected);
+			_selected = null;
+			_editMode = false;
+			_editorLines = null;
+			Refresh();
+		}
+
 		// ---- refresh / selection -----------------------------------------
 
 		public void Refresh()
 		{
 			_macroList?.Clear();
 			foreach (var m in MacroLibrary.All.OrderBy(m => m.Name)) {
-				var entry = new MacroListItem(m, m.Name == _selected, () => Select(m.Name));
-				_macroList.Add(entry);
+				_macroList.Add(new MacroListItem(m, m.Name == _selected, () => Select(m.Name)));
 			}
 			RefreshDetail();
 		}
@@ -277,18 +354,23 @@ namespace MacroMod.Common.UI
 		public void Select(string name)
 		{
 			_selected = name;
+			_editMode = false;
+			_editorLines = null;
 			Refresh();
 		}
 
 		private void RefreshDetail()
 		{
-			if (_detailLines == null) return;
-			_detailLines.Clear();
-			var macro = _selected != null ? MacroLibrary.FindMacro(_selected) : null;
+			_detailPanel.RemoveChild(_previewPanel);
+			_detailPanel.RemoveChild(_editorPanel);
+
+			Macro macro = _selected != null ? MacroLibrary.FindMacro(_selected) : null;
 			if (macro == null) {
 				_detailTitle.SetText(Language.GetText("Mods.MacroMod.UI.NoSelection"));
 				_detailKeybind.SetText(string.Empty);
 				_detailStatus.SetText(string.Empty);
+				_detailPanel.Append(_previewPanel);
+				_previewLines.Clear();
 				return;
 			}
 			_detailTitle.SetText(macro.Name);
@@ -297,9 +379,7 @@ namespace MacroMod.Common.UI
 			int boundSlot = -1;
 			if (p != null) {
 				for (int i = 0; i < MacroKeybindSystem.SlotCount; i++) {
-					if (string.Equals(p.GetSlot(i), macro.Name, StringComparison.OrdinalIgnoreCase)) {
-						boundSlot = i; break;
-					}
+					if (string.Equals(p.GetSlot(i), macro.Name, StringComparison.OrdinalIgnoreCase)) { boundSlot = i; break; }
 				}
 			}
 			_detailKeybind.SetText(boundSlot < 0
@@ -310,9 +390,25 @@ namespace MacroMod.Common.UI
 				? string.Format(Language.GetTextValue("Mods.MacroMod.UI.ParseError"), macro.ParseError)
 				: string.Format(Language.GetTextValue("Mods.MacroMod.UI.Lines"), macro.Source?.Split('\n').Length ?? 0));
 
+			_editToggleBtn?.SetText(_editMode
+				? Language.GetTextValue("Mods.MacroMod.UI.Cancel")
+				: Language.GetTextValue("Mods.MacroMod.UI.Edit"));
+
+			if (_editMode) {
+				_detailPanel.Append(_editorPanel);
+			}
+			else {
+				_detailPanel.Append(_previewPanel);
+				FillPreview(macro);
+			}
+		}
+
+		private void FillPreview(Macro macro)
+		{
+			_previewLines.Clear();
 			foreach (string raw in (macro.Source ?? string.Empty).Replace("\r\n", "\n").Split('\n')) {
 				var t = new UIText(raw.Length == 0 ? " " : raw, 0.78f) { TextColor = ColorForLine(raw) };
-				_detailLines.Add(t);
+				_previewLines.Add(t);
 			}
 		}
 
@@ -328,25 +424,115 @@ namespace MacroMod.Common.UI
 			return Color.White;
 		}
 
-		// ---- helper element ----------------------------------------------
+		// ---- editor list -------------------------------------------------
+
+		private void RebuildEditor()
+		{
+			_editorList.Clear();
+			if (_editorLines == null) return;
+			int depth = 0;
+			for (int i = 0; i < _editorLines.Count; i++) {
+				int displayDepth = depth;
+				switch (_editorLines[i].Keyword) {
+					case "/elseif":
+					case "/else":
+						displayDepth = Math.Max(0, depth - 1);
+						break;
+					case "/endif":
+					case "/endwhile":
+						displayDepth = Math.Max(0, depth - 1);
+						depth = displayDepth;
+						break;
+				}
+				var row = new LineRow(_editorLines[i], i) { IndentLevel = displayDepth };
+				WireRow(row);
+				row.RefreshFromModel(i, displayDepth);
+				_editorList.Add(row);
+
+				switch (_editorLines[i].Keyword) {
+					case "/if":
+					case "/while":
+						depth++;
+						break;
+				}
+			}
+		}
+
+		private void WireRow(LineRow row)
+		{
+			row.RequestEditCommand = (idx, current) => OpenPopup(new CommandPickerPopup {
+				OnPicked = kw => {
+					if (idx >= 0 && idx < _editorLines.Count) {
+						_editorLines[idx].Keyword = kw;
+						_editorLines[idx].RawOverride = null;
+						RebuildEditor();
+					}
+				}
+			});
+			row.RequestEditConditions = idx => OpenPopup(new ConditionPopup(idx >= 0 && idx < _editorLines.Count ? _editorLines[idx].Conditions : string.Empty) {
+				OnApply = serialized => {
+					if (idx >= 0 && idx < _editorLines.Count) {
+						_editorLines[idx].Conditions = serialized;
+						RebuildEditor();
+					}
+				}
+			});
+			row.RequestPickContent = (idx, isBuff) => OpenPopup(new ItemPickerPopup(isBuff) {
+				OnPicked = name => {
+					if (idx >= 0 && idx < _editorLines.Count) {
+						_editorLines[idx].Args = name;
+						RebuildEditor();
+					}
+				}
+			});
+			row.RequestMoveUp = idx => { if (idx > 0) { (_editorLines[idx], _editorLines[idx - 1]) = (_editorLines[idx - 1], _editorLines[idx]); RebuildEditor(); } };
+			row.RequestMoveDown = idx => { if (idx >= 0 && idx < _editorLines.Count - 1) { (_editorLines[idx], _editorLines[idx + 1]) = (_editorLines[idx + 1], _editorLines[idx]); RebuildEditor(); } };
+			row.RequestDelete = idx => { if (idx >= 0 && idx < _editorLines.Count) { _editorLines.RemoveAt(idx); RebuildEditor(); } };
+			row.RequestDuplicate = idx => {
+				if (idx >= 0 && idx < _editorLines.Count) {
+					var src = _editorLines[idx];
+					var clone = new VisualLine { Keyword = src.Keyword, Args = src.Args, Conditions = src.Conditions, RawOverride = src.RawOverride };
+					_editorLines.Insert(idx + 1, clone);
+					RebuildEditor();
+				}
+			};
+			row.RequestInsertAfter = idx => { _editorLines.Insert(idx + 1, new VisualLine()); RebuildEditor(); };
+			row.OnDirty = () => { /* args field already updated on the model */ };
+		}
+
+		// ---- popup management --------------------------------------------
+
+		public void OpenPopup(UIElement popup)
+		{
+			_popupStack.Add(popup);
+			Append(popup);
+			popup.Activate();
+			popup.Recalculate();
+		}
+
+		public void ClosePopup(UIElement popup)
+		{
+			if (popup == null) return;
+			_popupStack.Remove(popup);
+			RemoveChild(popup);
+		}
+
+		public bool HasOpenPopup => _popupStack.Count > 0;
+
+		// ---- helper subclasses -------------------------------------------
 
 		private class MacroListItem : UIPanel
 		{
-			private readonly Action _onClick;
 			public MacroListItem(Macro macro, bool selected, Action onClick)
 			{
-				_onClick = onClick;
 				BackgroundColor = selected ? new Color(120, 100, 200) : new Color(50, 60, 110);
 				Width.Set(0f, 1f);
 				Height.Set(28f, 0f);
 				SetPadding(4f);
-				var t = new UIText(macro.Name + (macro.HasError ? " (!)" : string.Empty), 0.9f);
-				Append(t);
-				OnLeftClick += (_, __) => _onClick?.Invoke();
+				Append(new UIText(macro.Name + (macro.HasError ? " (!)" : string.Empty), 0.9f));
+				OnLeftClick += (_, __) => onClick?.Invoke();
 			}
 		}
-
-		// ---- drag-friendly root panel ------------------------------------
 
 		private class DraggablePanel : UIPanel
 		{

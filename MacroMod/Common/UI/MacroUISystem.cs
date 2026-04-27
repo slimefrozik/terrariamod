@@ -53,6 +53,11 @@ namespace MacroMod.Common.UI
 			Visible = false;
 		}
 
+		public void ClosePopup(UIElement popup)
+		{
+			Panel?.ClosePopup(popup);
+		}
+
 		public override void UpdateUI(GameTime gameTime)
 		{
 			_lastUpdate = gameTime;
