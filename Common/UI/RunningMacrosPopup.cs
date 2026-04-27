@@ -66,14 +66,14 @@ namespace MacroMod.Common.UI
 			Refresh();
 		}
 
-		private int _lastRunningCount = -1;
+		private int _lastSignature;
 
 		private void Refresh()
 		{
 			var running = MacroSystem.Instance?.Running;
-			int count = running?.Count ?? 0;
-			if (count == _lastRunningCount) return;
-			_lastRunningCount = count;
+			int sig = ComputeSignature(running);
+			if (sig == _lastSignature) return;
+			_lastSignature = sig;
 			_list.Clear();
 			if (running == null || running.Count == 0) {
 				var empty = new UIText(Language.GetText("Mods.MacroMod.UI.RunningEmpty"), 0.85f) {
@@ -85,6 +85,19 @@ namespace MacroMod.Common.UI
 			foreach (MacroExecutor ex in running.ToArray()) {
 				_list.Add(BuildRow(ex));
 			}
+		}
+
+		// Signature combines the identity of every executor reference, so a
+		// swap (one macro finishes, another starts in the same tick) still
+		// invalidates the cached list even when Count happens to match.
+		private static int ComputeSignature(System.Collections.Generic.IReadOnlyList<MacroExecutor> running)
+		{
+			if (running == null || running.Count == 0) return 0;
+			int hash = 17;
+			for (int i = 0; i < running.Count; i++) {
+				hash = unchecked(hash * 31 + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(running[i]));
+			}
+			return hash;
 		}
 
 		private UIElement BuildRow(MacroExecutor ex)
@@ -105,7 +118,7 @@ namespace MacroMod.Common.UI
 			stopBtn.OnLeftClick += (_, __) => {
 				MacroSystem.StopMacro(ex);
 				OnAfterChange?.Invoke();
-				_lastRunningCount = -1; // force rebuild next tick
+				_lastSignature = 0; // force rebuild next tick
 			};
 			row.Append(stopBtn);
 			return row;
