@@ -46,6 +46,11 @@ namespace MacroMod.Common.UI
 		private UIList _editorList;
 		private UIScrollbar _editorScroll;
 
+		private TriggersTab _triggersTab;
+
+		private UITextPanel<LocalizedText> _tabEditorBtn;
+		private UITextPanel<LocalizedText> _tabTriggersBtn;
+
 		private TextInput _newNameBox;
 		private UITextPanel<LocalizedText> _editToggleBtn;
 		private UITextPanel<LocalizedText> _saveBtn;
@@ -55,6 +60,9 @@ namespace MacroMod.Common.UI
 		private string _selected;
 		private bool _editMode;
 		private List<VisualLine> _editorLines;
+		private DetailTab _activeTab = DetailTab.Editor;
+
+		private enum DetailTab { Editor, Triggers }
 
 		private readonly List<UIElement> _popupStack = new();
 
@@ -110,9 +118,21 @@ namespace MacroMod.Common.UI
 			col.HAlign = 0f;
 			_root.Append(col);
 
+			// Big green "+ Create macro" CTA pinned to the top of the left
+			// column.  Click → focuses the name input below the list.
+			var createBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.CreateMacroCta"), 0.95f, true) {
+				BackgroundColor = UIPalette.PillRunning,
+				BorderColor = Color.Transparent,
+			};
+			createBtn.Width.Set(0f, 1f);
+			createBtn.Height.Set(40f, 0f);
+			createBtn.OnLeftClick += (_, __) => CreateNewMacro();
+			col.Append(createBtn);
+
 			var listPanel = new UIPanel { BackgroundColor = new Color(60, 70, 130) };
 			listPanel.Width.Set(0f, 1f);
-			listPanel.Height.Set(-72f, 1f);
+			listPanel.Height.Set(-(46f + 64f), 1f);
+			listPanel.Top.Set(46f, 0f);
 			listPanel.SetPadding(4f);
 			col.Append(listPanel);
 
@@ -127,10 +147,11 @@ namespace MacroMod.Common.UI
 			listPanel.Append(_macroScroll);
 			_macroList.SetScrollbar(_macroScroll);
 
+			// Compact rename/quick-create row at the bottom of the column.
 			var newBg = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
 			newBg.Width.Set(0f, 1f);
 			newBg.Height.Set(28f, 0f);
-			newBg.Top.Set(-66f, 1f);
+			newBg.Top.Set(-58f, 1f);
 			newBg.SetPadding(2f);
 			col.Append(newBg);
 
@@ -139,20 +160,35 @@ namespace MacroMod.Common.UI
 			_newNameBox.Height.Set(0f, 1f);
 			newBg.Append(_newNameBox);
 
-			var addBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.NewMacro"), 0.85f, true);
-			addBtn.Width.Set(0f, 1f);
-			addBtn.Height.Set(28f, 0f);
-			addBtn.Top.Set(-32f, 1f);
-			addBtn.OnLeftClick += (_, __) => {
-				string n = _newNameBox.Text;
-				if (string.IsNullOrWhiteSpace(n)) return;
-				var m = MacroLibrary.CreateMacro(n,
-					"# " + n + "\n# Example:\n# /use Wooden Sword\n# /wait 1\n# /quickheal\n");
-				if (m != null) Select(m.Name);
-				_newNameBox.Text = string.Empty;
-				Refresh();
+			var addBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.NewMacro"), 0.78f, true) {
+				BackgroundColor = UIPalette.PillBound,
+				BorderColor = Color.Transparent,
 			};
+			addBtn.Width.Set(0f, 1f);
+			addBtn.Height.Set(26f, 0f);
+			addBtn.Top.Set(-26f, 1f);
+			addBtn.OnLeftClick += (_, __) => CreateNewMacro();
 			col.Append(addBtn);
+		}
+
+		private void CreateNewMacro()
+		{
+			string n = _newNameBox?.Text;
+			// If the name field is empty, generate a unique default name so
+			// the prominent CTA always works without forcing the user to
+			// type something first.
+			if (string.IsNullOrWhiteSpace(n)) {
+				int suffix = 1;
+				do {
+					n = string.Format(Language.GetTextValue("Mods.MacroMod.UI.NewMacroDefault"), suffix);
+					suffix++;
+				} while (MacroLibrary.FindMacro(n) != null && suffix < 1000);
+			}
+			var m = MacroLibrary.CreateMacro(n,
+				"# " + n + "\n# /use Wooden Sword\n# /wait 1\n# /quickheal\n");
+			if (m != null) Select(m.Name);
+			if (_newNameBox != null) _newNameBox.Text = string.Empty;
+			Refresh();
 		}
 
 		// ---- right column ------------------------------------------------
@@ -208,9 +244,14 @@ namespace MacroMod.Common.UI
 				if (i == 3) _saveBtn = btn;
 			}
 
-			// Preview (read-only) panel — fills the gap between toolbar and the
+			// Tab strip sits between the toolbar and the content area.
+			float tabsTop = DetailToolbarTop + DetailToolbarHeight + 6f;   // 76 + 32 + 6 = 114
+			const float tabsHeight = 28f;
+			BuildTabStrip(tabsTop, tabsHeight);
+
+			// Preview (read-only) panel — fills the gap between tabs and the
 			// keybind row at the bottom (KeybindRowHeight + small padding).
-			float previewTop = DetailToolbarTop + DetailToolbarHeight + 8f; // 76 + 32 + 8 = 116
+			float previewTop = tabsTop + tabsHeight + 6f;                   // 114 + 28 + 6 = 148
 			float previewBottomReserved = KeybindRowHeight + 8f;            // pinned bind row
 			_previewPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
 			_previewPanel.Width.Set(0f, 1f);
@@ -267,7 +308,57 @@ namespace MacroMod.Common.UI
 			insertTplBtn.OnLeftClick += (_, __) => OpenTemplatePopup();
 			_editorPanel.Append(insertTplBtn);
 
+			// Triggers tab content shares the same vertical envelope as the
+			// preview/editor panels.  Created lazily-attached but kept around
+			// so its child input fields preserve their state across switches.
+			_triggersTab = new TriggersTab {
+				OpenPopup = (popup) => { OpenPopup(popup); return popup; },
+				OnSave = (triggers, mode) => {
+					var macro = MacroLibrary.FindMacro(_selected);
+					if (macro == null) return;
+					MacroLibrary.UpdateTriggers(macro, triggers, mode);
+					Refresh();
+					Main.NewText(Language.GetTextValue("Mods.MacroMod.UI.TriggersSaved"), new Color(120, 200, 120));
+				},
+			};
+			_triggersTab.Width.Set(0f, 1f);
+			_triggersTab.Height.Set(-(previewTop + previewBottomReserved), 1f);
+			_triggersTab.Top.Set(previewTop, 0f);
+
 			AppendKeybindRow();
+		}
+
+		private void BuildTabStrip(float top, float height)
+		{
+			_tabEditorBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.TabEditor"), 0.82f, true) {
+				BackgroundColor = UIPalette.PillActive,
+				BorderColor = Color.Transparent,
+			};
+			_tabEditorBtn.Width.Set(160f, 0f);
+			_tabEditorBtn.Height.Set(height, 0f);
+			_tabEditorBtn.Top.Set(top, 0f);
+			_tabEditorBtn.Left.Set(0f, 0f);
+			_tabEditorBtn.OnLeftClick += (_, __) => SetActiveTab(DetailTab.Editor);
+			_detailPanel.Append(_tabEditorBtn);
+
+			_tabTriggersBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.TabTriggers"), 0.82f, true) {
+				BackgroundColor = UIPalette.PillNeutral,
+				BorderColor = Color.Transparent,
+			};
+			_tabTriggersBtn.Width.Set(160f, 0f);
+			_tabTriggersBtn.Height.Set(height, 0f);
+			_tabTriggersBtn.Top.Set(top, 0f);
+			_tabTriggersBtn.Left.Set(166f, 0f);
+			_tabTriggersBtn.OnLeftClick += (_, __) => SetActiveTab(DetailTab.Triggers);
+			_detailPanel.Append(_tabTriggersBtn);
+		}
+
+		private void SetActiveTab(DetailTab tab)
+		{
+			_activeTab = tab;
+			_tabEditorBtn.BackgroundColor = tab == DetailTab.Editor ? UIPalette.PillActive : UIPalette.PillNeutral;
+			_tabTriggersBtn.BackgroundColor = tab == DetailTab.Triggers ? UIPalette.PillActive : UIPalette.PillNeutral;
+			RefreshDetail();
 		}
 
 		private UITextPanel<LocalizedText> MakeToolbarBtn(string langKey, float slotFraction, float leftFraction, Color tint, Action act)
@@ -450,6 +541,7 @@ namespace MacroMod.Common.UI
 		{
 			_detailPanel.RemoveChild(_previewPanel);
 			_detailPanel.RemoveChild(_editorPanel);
+			_detailPanel.RemoveChild(_triggersTab);
 
 			Macro macro = _selected != null ? MacroLibrary.FindMacro(_selected) : null;
 			if (macro == null) {
@@ -473,15 +565,28 @@ namespace MacroMod.Common.UI
 				? Language.GetTextValue("Mods.MacroMod.UI.Unbound")
 				: string.Format(Language.GetTextValue("Mods.MacroMod.UI.Bound"), boundSlot + 1));
 
-			_detailStatus.SetText(macro.HasError
-				? string.Format(Language.GetTextValue("Mods.MacroMod.UI.ParseError"), macro.ParseError)
-				: string.Format(Language.GetTextValue("Mods.MacroMod.UI.Lines"), macro.Source?.Split('\n').Length ?? 0));
+			string status;
+			if (macro.HasError) {
+				status = string.Format(Language.GetTextValue("Mods.MacroMod.UI.ParseError"), macro.ParseError);
+			}
+			else {
+				int triggerCount = macro.Triggers?.Count ?? 0;
+				int lineCount = macro.Program?.Count ?? 0;
+				status = triggerCount > 0
+					? string.Format(Language.GetTextValue("Mods.MacroMod.UI.LinesWithTriggers"), lineCount, triggerCount)
+					: string.Format(Language.GetTextValue("Mods.MacroMod.UI.Lines"), lineCount);
+			}
+			_detailStatus.SetText(status);
 
 			_editToggleBtn?.SetText(_editMode
 				? Language.GetText("Mods.MacroMod.UI.Cancel")
 				: Language.GetText("Mods.MacroMod.UI.Edit"));
 
-			if (_editMode) {
+			if (_activeTab == DetailTab.Triggers) {
+				_triggersTab.Load(macro.Triggers, macro.TriggerMode);
+				_detailPanel.Append(_triggersTab);
+			}
+			else if (_editMode) {
 				_detailPanel.Append(_editorPanel);
 			}
 			else {

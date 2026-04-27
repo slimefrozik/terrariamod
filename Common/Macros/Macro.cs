@@ -18,6 +18,20 @@ namespace MacroMod.Common.Macros
 		/// <summary>Optional one-line description for the in-game list UI.</summary>
 		public string Description = string.Empty;
 
+		/// <summary>
+		/// Auto-execution triggers parsed from the file's @triggers header.
+		/// When any (or all, depending on <see cref="TriggerMode"/>) of these
+		/// transitions from false to true, MacroSystem starts the macro.
+		/// </summary>
+		public List<MacroTrigger> Triggers = new();
+
+		public TriggerMatchMode TriggerMode = TriggerMatchMode.Any;
+
+		public bool TriggersEnabled => Triggers != null && Triggers.Count > 0;
+
+		[NonSerialized] public bool LastTriggerValue;
+		[NonSerialized] public bool TriggerInitialized;
+
 		public Macro(string name)
 		{
 			Name = name;

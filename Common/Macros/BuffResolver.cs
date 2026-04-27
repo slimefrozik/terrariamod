@@ -12,6 +12,16 @@ namespace MacroMod.Common.Macros
 
 		public static void ResetCache() => Cache.Clear();
 
+		public static bool PlayerHasBuff(Player player, string raw)
+		{
+			if (player == null || string.IsNullOrWhiteSpace(raw)) return false;
+			if (!TryResolve(raw, out int id) || id <= 0) return false;
+			for (int i = 0; i < Player.MaxBuffs; i++) {
+				if (player.buffType[i] == id && player.buffTime[i] > 0) return true;
+			}
+			return false;
+		}
+
 		public static bool TryResolve(string raw, out int buffId)
 		{
 			buffId = 0;
