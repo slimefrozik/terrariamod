@@ -32,6 +32,7 @@ namespace MacroMod.Common.Macros
 		// Action latches for the host system to consume after each tick.
 		public int PendingHotbarSlot = -1;
 		public bool PendingUseItem;
+		public bool PendingUseAlt;
 		public string PendingChat;
 		public Action<Player> PendingPlayerAction;
 
@@ -382,9 +383,8 @@ namespace MacroMod.Common.Macros
 				case "once":
 				case "click":
 				default:
-					if (alt) HoldUseAlt = true;
+					if (alt) PendingUseAlt = true;
 					else PendingUseItem = true;
-					// alt only fires for one tick by virtue of DrainPending below.
 					return false;
 			}
 		}

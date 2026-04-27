@@ -110,8 +110,9 @@ namespace MacroMod.Common.Systems
 				player.controlUseItem = true;
 				ex.PendingUseItem = false;
 			}
-			if (ex.HoldUseAlt) {
+			if (ex.PendingUseAlt || ex.HoldUseAlt) {
 				player.controlUseTile = true;
+				ex.PendingUseAlt = false;
 			}
 			if (!string.IsNullOrEmpty(ex.PendingChat)) {
 				if (Main.netMode == NetmodeID.SinglePlayer) {
