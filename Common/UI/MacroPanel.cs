@@ -21,8 +21,14 @@ namespace MacroMod.Common.UI
 	/// </summary>
 	public class MacroPanel : UIState
 	{
-		private const float PanelWidth = 880f;
-		private const float PanelHeight = 540f;
+		private const float PanelWidth = 1024f;
+		private const float PanelHeight = 640f;
+
+		// Vertical layout slots for the right-hand detail column.  Toolbar sits
+		// just below the title block, the keybind bar pinned to the bottom.
+		private const float DetailToolbarTop = 76f;   // title (0..28) + keybind (28..50) + status (50..70)
+		private const float DetailToolbarHeight = 32f;
+		private const float KeybindRowHeight = 38f;
 
 		private DraggablePanel _root;
 		private UIList _macroList;
@@ -41,9 +47,9 @@ namespace MacroMod.Common.UI
 		private UIScrollbar _editorScroll;
 
 		private TextInput _newNameBox;
-		private UITextPanel<string> _editToggleBtn;
-		private UITextPanel<string> _saveBtn;
-		private UITextPanel<string> _runBtn;
+		private UITextPanel<LocalizedText> _editToggleBtn;
+		private UITextPanel<LocalizedText> _saveBtn;
+		private UITextPanel<LocalizedText> _runBtn;
 
 		private string _selected;
 		private bool _editMode;
@@ -113,12 +119,12 @@ namespace MacroMod.Common.UI
 			newBg.SetPadding(2f);
 			col.Append(newBg);
 
-			_newNameBox = new TextInput(Language.GetTextValue("Mods.MacroMod.UI.NewName"));
+			_newNameBox = new TextInput(Language.GetText("Mods.MacroMod.UI.NewName").Value);
 			_newNameBox.Width.Set(0f, 1f);
 			_newNameBox.Height.Set(0f, 1f);
 			newBg.Append(_newNameBox);
 
-			var addBtn = new UITextPanel<string>(Language.GetTextValue("Mods.MacroMod.UI.NewMacro"), 0.85f, true);
+			var addBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.NewMacro"), 0.85f, true);
 			addBtn.Width.Set(0f, 1f);
 			addBtn.Height.Set(28f, 0f);
 			addBtn.Top.Set(-32f, 1f);
@@ -157,22 +163,30 @@ namespace MacroMod.Common.UI
 			_detailStatus.Top.Set(50f, 0f);
 			_detailPanel.Append(_detailStatus);
 
-			// Toolbar buttons (run / edit-toggle / save / reload / open-folder / external / delete)
-			_runBtn = AppendToolbarBtn("Mods.MacroMod.UI.Run", 0, () => {
+			// Toolbar buttons (run / edit-toggle / save / templates / reload / open-folder / external / delete).
+			// All eight buttons share a single fixed row at DetailToolbarTop; widths
+			// are computed from the index so localised labels never overflow into
+			// the keybind row pinned to the bottom of the panel.
+			int toolbarCount = 8;
+			_runBtn = AppendToolbarBtn("Mods.MacroMod.UI.Run", 0, toolbarCount, () => {
 				if (_selected != null) MacroSystem.StartMacro(_selected);
 			});
-			_editToggleBtn = AppendToolbarBtn("Mods.MacroMod.UI.Edit", 1, ToggleEditMode);
-			_saveBtn = AppendToolbarBtn("Mods.MacroMod.UI.Save", 2, SaveEdit);
-			AppendToolbarBtn("Mods.MacroMod.UI.Reload", 3, () => { MacroLibrary.ReloadAll(); Refresh(); });
-			AppendToolbarBtn("Mods.MacroMod.UI.OpenFolder", 4, OpenFolder);
-			AppendToolbarBtn("Mods.MacroMod.UI.EditExternal", 5, OpenInExternalEditor);
-			AppendToolbarBtn("Mods.MacroMod.UI.Delete", 6, DeleteSelected);
+			_editToggleBtn = AppendToolbarBtn("Mods.MacroMod.UI.Edit", 1, toolbarCount, ToggleEditMode);
+			_saveBtn = AppendToolbarBtn("Mods.MacroMod.UI.Save", 2, toolbarCount, SaveEdit);
+			AppendToolbarBtn("Mods.MacroMod.UI.Templates", 3, toolbarCount, OpenTemplatePopup);
+			AppendToolbarBtn("Mods.MacroMod.UI.Reload", 4, toolbarCount, () => { MacroLibrary.ReloadAll(); Refresh(); });
+			AppendToolbarBtn("Mods.MacroMod.UI.OpenFolder", 5, toolbarCount, OpenFolder);
+			AppendToolbarBtn("Mods.MacroMod.UI.EditExternal", 6, toolbarCount, OpenInExternalEditor);
+			AppendToolbarBtn("Mods.MacroMod.UI.Delete", 7, toolbarCount, DeleteSelected);
 
-			// Preview (read-only) panel
+			// Preview (read-only) panel — fills the gap between toolbar and the
+			// keybind row at the bottom (KeybindRowHeight + small padding).
+			float previewTop = DetailToolbarTop + DetailToolbarHeight + 8f; // 76 + 32 + 8 = 116
+			float previewBottomReserved = KeybindRowHeight + 8f;            // pinned bind row
 			_previewPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
 			_previewPanel.Width.Set(0f, 1f);
-			_previewPanel.Height.Set(-180f, 1f);
-			_previewPanel.Top.Set(76f, 0f);
+			_previewPanel.Height.Set(-(previewTop + previewBottomReserved), 1f);
+			_previewPanel.Top.Set(previewTop, 0f);
 			_previewPanel.SetPadding(4f);
 			_detailPanel.Append(_previewPanel);
 
@@ -187,11 +201,12 @@ namespace MacroMod.Common.UI
 			_previewPanel.Append(_previewScroll);
 			_previewLines.SetScrollbar(_previewScroll);
 
-			// Editor panel (visual builder)
+			// Editor panel (visual builder) shares the same vertical envelope as
+			// the preview panel so toggling between them does not shift other UI.
 			_editorPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
 			_editorPanel.Width.Set(0f, 1f);
-			_editorPanel.Height.Set(-180f, 1f);
-			_editorPanel.Top.Set(76f, 0f);
+			_editorPanel.Height.Set(-(previewTop + previewBottomReserved), 1f);
+			_editorPanel.Top.Set(previewTop, 0f);
 			_editorPanel.SetPadding(4f);
 
 			_editorList = new UIList { ListPadding = 4f };
@@ -205,8 +220,8 @@ namespace MacroMod.Common.UI
 			_editorPanel.Append(_editorScroll);
 			_editorList.SetScrollbar(_editorScroll);
 
-			var addLineBtn = new UITextPanel<string>(Language.GetTextValue("Mods.MacroMod.UI.AddLine"), 0.85f, true);
-			addLineBtn.Width.Set(0f, 1f);
+			var addLineBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.AddLine"), 0.85f, true);
+			addLineBtn.Width.Set(-160f, 1f);
 			addLineBtn.Height.Set(36f, 0f);
 			addLineBtn.Top.Set(-36f, 1f);
 			addLineBtn.OnLeftClick += (_, __) => {
@@ -215,16 +230,26 @@ namespace MacroMod.Common.UI
 			};
 			_editorPanel.Append(addLineBtn);
 
+			var insertTplBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.Templates"), 0.85f, true);
+			insertTplBtn.Width.Set(150f, 0f);
+			insertTplBtn.Height.Set(36f, 0f);
+			insertTplBtn.Top.Set(-36f, 1f);
+			insertTplBtn.HAlign = 1f;
+			insertTplBtn.OnLeftClick += (_, __) => OpenTemplatePopup();
+			_editorPanel.Append(insertTplBtn);
+
 			AppendKeybindRow();
 		}
 
-		private UITextPanel<string> AppendToolbarBtn(string langKey, int index, Action act)
+		private UITextPanel<LocalizedText> AppendToolbarBtn(string langKey, int index, int total, Action act)
 		{
-			var btn = new UITextPanel<string>(Language.GetTextValue(langKey), 0.75f, true);
-			btn.Width.Set(0f, 0.135f);
-			btn.Height.Set(28f, 0f);
-			btn.HAlign = index / 6f;
-			btn.Top.Set(-72f, 1f);
+			var btn = new UITextPanel<LocalizedText>(Language.GetText(langKey), 0.78f, true);
+			float slot = 1f / total;
+			float gap = 0.005f;
+			btn.Width.Set(-4f, slot - gap);
+			btn.Height.Set(DetailToolbarHeight, 0f);
+			btn.Left.Set(0f, slot * index);
+			btn.Top.Set(DetailToolbarTop, 0f);
 			btn.OnLeftClick += (_, __) => {
 				try { act(); } catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
 			};
@@ -234,22 +259,25 @@ namespace MacroMod.Common.UI
 
 		private void AppendKeybindRow()
 		{
-			var row = new UIElement();
+			var row = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
 			row.Width.Set(0f, 1f);
-			row.Height.Set(34f, 0f);
-			row.Top.Set(-36f, 1f);
+			row.Height.Set(KeybindRowHeight, 0f);
+			row.Top.Set(-KeybindRowHeight, 1f);
+			row.SetPadding(4f);
 			_detailPanel.Append(row);
 
-			var label = new UIText(Language.GetText("Mods.MacroMod.UI.BindSlot"), 0.85f);
+			var label = new UIText(Language.GetText("Mods.MacroMod.UI.BindSlot"), 0.78f);
 			label.Top.Set(8f, 0f);
 			row.Append(label);
 
+			// 24 slots fit in two rows of 12 if needed; but we have ~700px
+			// available so a single row of 22px buttons fits.
 			for (int i = 0; i < MacroKeybindSystem.SlotCount; i++) {
 				int slotIndex = i;
 				var btn = new UITextPanel<string>((i + 1).ToString(), 0.7f, true);
-				btn.Width.Set(22f, 0f);
-				btn.Height.Set(28f, 0f);
-				btn.Left.Set(110f + i * 24f, 0f);
+				btn.Width.Set(24f, 0f);
+				btn.Height.Set(26f, 0f);
+				btn.Left.Set(120f + i * 26f, 0f);
 				btn.Top.Set(2f, 0f);
 				btn.OnLeftClick += (_, __) => BindSlot(slotIndex);
 				row.Append(btn);
@@ -332,6 +360,24 @@ namespace MacroMod.Common.UI
 			catch (Exception e) { Main.NewText("MacroMod: " + e.Message, Color.IndianRed); }
 		}
 
+		private void OpenTemplatePopup()
+		{
+			OpenPopup(new TemplatePopup {
+				OnPicked = (name, source) => {
+					string baseName = string.IsNullOrWhiteSpace(name) ? "template" : name;
+					string finalName = baseName;
+					int suffix = 1;
+					while (MacroLibrary.FindMacro(finalName) != null) {
+						suffix++;
+						finalName = baseName + " " + suffix;
+					}
+					var m = MacroLibrary.CreateMacro(finalName, source);
+					if (m != null) Select(m.Name);
+					Refresh();
+				}
+			});
+		}
+
 		private void DeleteSelected()
 		{
 			if (_selected == null) return;
@@ -395,8 +441,8 @@ namespace MacroMod.Common.UI
 				: string.Format(Language.GetTextValue("Mods.MacroMod.UI.Lines"), macro.Source?.Split('\n').Length ?? 0));
 
 			_editToggleBtn?.SetText(_editMode
-				? Language.GetTextValue("Mods.MacroMod.UI.Cancel")
-				: Language.GetTextValue("Mods.MacroMod.UI.Edit"));
+				? Language.GetText("Mods.MacroMod.UI.Cancel")
+				: Language.GetText("Mods.MacroMod.UI.Edit"));
 
 			if (_editMode) {
 				_detailPanel.Append(_editorPanel);
