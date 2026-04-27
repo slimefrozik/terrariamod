@@ -65,6 +65,13 @@ Mods: {
 			Templates: Шаблоны
 			PickTemplate: Выберите шаблон макроса
 			TemplateHelp: "Выберите готовый сценарий — будет создан новый макрос с уже заполненным скриптом."
+			Stop: Стоп
+			StopAll: Остановить все
+			RunningPill: "Активно: {0}"
+			RunningIdle: Простой
+			RunningTitle: Запущенные макросы
+			RunningEmpty: Сейчас не запущено ни одного макроса.
+			Preview: Превью
 		}
 
 		NoSuchItem: "Не найден предмет '{0}'."

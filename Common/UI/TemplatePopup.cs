@@ -8,9 +8,9 @@ using Terraria.UI;
 namespace MacroMod.Common.UI
 {
 	/// <summary>
-	/// Popup that lists ready-made macro scenarios so the user can drop a
-	/// fully working multi-line example into a fresh macro instead of
-	/// authoring it line-by-line.
+	/// Popup that lists ready-made macro scenarios with a script preview on
+	/// the right pane.  Selecting an item highlights it and shows its full
+	/// source; "Create" copies it into a new macro.
 	/// </summary>
 	public class TemplatePopup : Popup
 	{
@@ -89,20 +89,29 @@ namespace MacroMod.Common.UI
 				+ "/drop Dirt Block 999\n"),
 		};
 
-		public TemplatePopup() : base(720f, 520f)
+		private Template _selected;
+		private readonly List<UIPanel> _entries = new();
+		private UIText _previewName;
+		private UIText _previewDesc;
+		private UIText _previewSource;
+		private UITextPanel<LocalizedText> _createBtn;
+
+		public TemplatePopup() : base(900f, 540f)
 		{
-			var title = new UIText(Language.GetText("Mods.MacroMod.UI.PickTemplate"), 1.0f, true);
-			title.HAlign = 0.5f;
+			var title = new UIText(Language.GetText("Mods.MacroMod.UI.PickTemplate"), 1.0f, true) { HAlign = 0f };
 			Append(title);
 
-			var help = new UIText(Language.GetText("Mods.MacroMod.UI.TemplateHelp"), 0.78f);
+			var help = new UIText(Language.GetText("Mods.MacroMod.UI.TemplateHelp"), 0.78f) {
+				TextColor = new Color(200, 210, 230),
+			};
 			help.Top.Set(28f, 0f);
 			help.Width.Set(0f, 1f);
 			Append(help);
 
-			var listPanel = new UIPanel { BackgroundColor = new Color(20, 25, 50) };
-			listPanel.Width.Set(0f, 1f);
-			listPanel.Height.Set(-72f, 1f);
+			// Left pane — list of templates ----------------------------------
+			var listPanel = new UIPanel { BackgroundColor = UIPalette.SunkenBg };
+			listPanel.Width.Set(-12f, 0.45f);
+			listPanel.Height.Set(-110f, 1f);
 			listPanel.Top.Set(56f, 0f);
 			listPanel.SetPadding(4f);
 			Append(listPanel);
@@ -119,26 +128,100 @@ namespace MacroMod.Common.UI
 			list.SetScrollbar(scroll);
 
 			foreach (var tpl in Templates) {
-				var entry = new UIPanel { BackgroundColor = new Color(40, 50, 100) };
+				Template captured = tpl;
+				var entry = new UIPanel { BackgroundColor = UIPalette.CardIdle };
 				entry.Width.Set(0f, 1f);
-				entry.Height.Set(60f, 0f);
+				entry.Height.Set(56f, 0f);
 				entry.SetPadding(6f);
 
 				var name = new UIText(tpl.Name, 0.9f, true);
 				entry.Append(name);
 
-				var desc = new UIText(tpl.Description, 0.7f) { TextColor = new Color(200, 210, 230) };
+				var desc = new UIText(TruncateLines(tpl.Description, 60), 0.7f) {
+					TextColor = new Color(200, 210, 230),
+				};
 				desc.Top.Set(22f, 0f);
 				entry.Append(desc);
 
-				Template captured = tpl;
-				entry.OnLeftClick += (_, __) => {
-					OnPicked?.Invoke(captured.Name, captured.Source);
-					Close();
-				};
-
+				entry.OnLeftClick += (_, __) => SelectTemplate(captured);
+				_entries.Add(entry);
 				list.Add(entry);
 			}
+
+			// Right pane — preview -------------------------------------------
+			var previewPanel = new UIPanel { BackgroundColor = UIPalette.SunkenBg };
+			previewPanel.Width.Set(0f, 0.55f);
+			previewPanel.Height.Set(-110f, 1f);
+			previewPanel.Top.Set(56f, 0f);
+			previewPanel.HAlign = 1f;
+			previewPanel.SetPadding(8f);
+			Append(previewPanel);
+
+			_previewName = new UIText("—", 1.0f, true);
+			previewPanel.Append(_previewName);
+
+			_previewDesc = new UIText(string.Empty, 0.78f) {
+				TextColor = new Color(200, 210, 230),
+			};
+			_previewDesc.Top.Set(28f, 0f);
+			_previewDesc.Width.Set(0f, 1f);
+			previewPanel.Append(_previewDesc);
+
+			var sourceWrap = new UIPanel { BackgroundColor = UIPalette.RootBg };
+			sourceWrap.Top.Set(72f, 0f);
+			sourceWrap.Width.Set(0f, 1f);
+			sourceWrap.Height.Set(-72f, 1f);
+			sourceWrap.SetPadding(6f);
+			previewPanel.Append(sourceWrap);
+
+			_previewSource = new UIText(string.Empty, 0.8f);
+			_previewSource.Width.Set(0f, 1f);
+			sourceWrap.Append(_previewSource);
+
+			// Footer — Create / Cancel ---------------------------------------
+			_createBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.NewMacro"), 0.85f, true) {
+				BackgroundColor = UIPalette.PillBound,
+				BorderColor = Color.Transparent,
+			};
+			_createBtn.Width.Set(220f, 0f);
+			_createBtn.Height.Set(38f, 0f);
+			_createBtn.Top.Set(-44f, 1f);
+			_createBtn.HAlign = 1f;
+			_createBtn.OnLeftClick += (_, __) => {
+				if (_selected.Source == null) return;
+				OnPicked?.Invoke(_selected.Name, _selected.Source);
+				Close();
+			};
+			Append(_createBtn);
+
+			var cancelBtn = new UITextPanel<LocalizedText>(Language.GetText("Mods.MacroMod.UI.Cancel"), 0.85f, true);
+			cancelBtn.Width.Set(120f, 0f);
+			cancelBtn.Height.Set(38f, 0f);
+			cancelBtn.Top.Set(-44f, 1f);
+			cancelBtn.HAlign = 0f;
+			cancelBtn.OnLeftClick += (_, __) => Close();
+			Append(cancelBtn);
+
+			if (Templates.Count > 0) SelectTemplate(Templates[0]);
+		}
+
+		private void SelectTemplate(Template tpl)
+		{
+			_selected = tpl;
+			for (int i = 0; i < _entries.Count; i++) {
+				_entries[i].BackgroundColor = ReferenceEquals(Templates[i].Source, tpl.Source)
+					? UIPalette.CardSelected
+					: UIPalette.CardIdle;
+			}
+			_previewName?.SetText(tpl.Name);
+			_previewDesc?.SetText(tpl.Description);
+			_previewSource?.SetText(tpl.Source.Replace("\t", "  "));
+		}
+
+		private static string TruncateLines(string s, int max)
+		{
+			if (string.IsNullOrEmpty(s) || s.Length <= max) return s;
+			return s.Substring(0, max - 3) + "...";
 		}
 
 		private readonly struct Template

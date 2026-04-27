@@ -77,6 +77,22 @@ namespace MacroMod.Common.Systems
 			Instance?._running.Clear();
 		}
 
+		/// <summary>Cancel a single running executor (no-op if not active).</summary>
+		public static void StopMacro(MacroExecutor ex)
+		{
+			Instance?._running.Remove(ex);
+		}
+
+		/// <summary>True iff at least one instance of this macro is currently running.</summary>
+		public static bool IsRunning(string macroName)
+		{
+			if (Instance == null || string.IsNullOrEmpty(macroName)) return false;
+			foreach (var ex in Instance._running) {
+				if (ex.Entry != null && string.Equals(ex.Entry.Name, macroName, System.StringComparison.OrdinalIgnoreCase)) return true;
+			}
+			return false;
+		}
+
 		// ---- per-frame ----------------------------------------------------
 
 		public override void PreUpdatePlayers()
